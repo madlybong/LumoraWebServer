@@ -1,0 +1,5 @@
+[test]
+# Sequential execution: prevents SQLite WAL / port collisions when running CLI and PHP harness tests.
+# Applied globally — affects both `bun test` and `bun run test`.
+jobs = 1
+timeout = 30000

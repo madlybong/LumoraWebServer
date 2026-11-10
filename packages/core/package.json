@@ -1,0 +1,84 @@
+{
+  "name": "@astrake/lumora-webserver",
+  "version": "0.1.0",
+  "description": "Headless PHP 8.2+ Enterprise Website Micro-Kernel, Tailwind CSS v4 Brand Layer Compiler, Zero-Dependency cPanel/aaPanel dist/ Bundler, and 12-Gate Automated Compliance Verifier.",
+  "author": "Anuvab Chakraborty (https://github.com/madlybong)",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "bin": {
+    "lumora-web": "./dist/bin/lumora-web.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    },
+    "./types": {
+      "types": "./dist/src/types/index.d.ts",
+      "import": "./dist/src/types/index.js"
+    },
+    "./cli": {
+      "types": "./dist/src/cli/index.d.ts",
+      "import": "./dist/src/cli/index.js"
+    },
+    "./runtime/css/lumora-base.css": "./runtime/css/lumora-base.css",
+    "./runtime/js/lumora-core.js": "./runtime/js/lumora-core.js"
+  },
+  "keywords": [
+    "php",
+    "bun",
+    "tailwindcss",
+    "framework",
+    "webserver",
+    "owasp",
+    "dpdp",
+    "gdpr",
+    "sqlite",
+    "lumora",
+    "astrake"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/madlybong/LumoraWebServer.git"
+  },
+  "homepage": "https://web.lumora.astrake.com",
+  "bugs": {
+    "url": "https://github.com/madlybong/LumoraWebServer/issues"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/madlybong"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "files": [
+    "dist",
+    "runtime",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "llms.txt",
+    "llms-full.txt",
+    "AGENTS.md",
+    ".cursorrules"
+  ],
+  "scripts": {
+    "prepack": "bun run ../../tools/pack-docs.ts copy",
+    "postpack": "bun run ../../tools/pack-docs.ts clean",
+    "build": "bun run ../../tools/build.ts",
+    "check": "tsc -p ./tsconfig.json",
+    "typecheck": "tsc -p ./tsconfig.strict.json"
+  },
+  "dependencies": {
+    "@tailwindcss/cli": "^4.1.0",
+    "tailwindcss": "^4.1.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "bun-types": "^1.3.14"
+  }
+}

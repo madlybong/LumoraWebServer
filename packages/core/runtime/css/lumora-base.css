@@ -1,0 +1,81 @@
+/* ==========================================================================
+   @astrake/lumora-webserver — Base CSS Architecture (runtime/css/lumora-base.css)
+   Compiled via Tailwind CSS v4 (@tailwindcss/cli) into public/assets/css/lumora.min.css
+   ========================================================================== */
+
+@import "tailwindcss";
+
+@theme {
+  /* Default Structural & Spacing Primitives (Overridden in each brand's css/brand-theme.css) */
+  --font-display: system-ui, -apple-system, sans-serif;
+  --font-sans: system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --site-max-width: 1440px;
+  --header-height: 72px;
+  --gutter-horizontal: clamp(20px, 4.5vw, 64px);
+  --section-padding-y: clamp(80px, 12vh, 148px);
+
+  --ease-lumora: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-dismiss: cubic-bezier(0.5, 0, 0.75, 0);
+}
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    scroll-padding-top: calc(var(--header-height) + 24px);
+    interpolate-size: allow-keywords;
+  }
+
+  /* Universal Keyboard Accessibility Focus Ring */
+  :focus-visible {
+    outline: var(--focus-ring, 2px solid var(--color-accent, #0055FF));
+    outline-offset: var(--focus-offset, 4px);
+  }
+
+  /* Skip Navigation Primitive */
+  .lumora-skip-link {
+    position: fixed;
+    top: -100%;
+    left: 1rem;
+    z-index: 9999;
+    padding: 0.75rem 1.25rem;
+    background: var(--color-surface-inv, #000000);
+    color: var(--color-ink-inv, #FFFFFF);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .lumora-skip-link:focus {
+    top: 1rem;
+  }
+
+  /* Honeypot Trap Isolation */
+  .lumora-honeypot {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+  }
+}
+
+/* First-Class Reduced Motion & Hardware Lite Tier Enforcement */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

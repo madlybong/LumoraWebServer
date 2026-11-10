@@ -1,0 +1,24 @@
+{
+  "framework": "@astrake/lumora-webserver",
+  "version": "0.1.0",
+  "core_sha256": {
+    "/core/blog-engine.php": "e2b3f8301f014daf69f22775243d1a531b0fb61d4fa2769ea59086cc135dad62",
+    "/core/bootstrap.php": "fa0dc020e5f1f27619a034f55a013306d621cb301b76d2f714421e5f99b588c4",
+    "/core/discovery.php": "68c0fad6c762da2825278804d7fc9679fb9f2203905822f84ec9b0cde3227a85",
+    "/core/docs-engine.php": "13949ae193d90bb26b81c233e5bb1580196e92d156de8d14b16704ffe5c02b91",
+    "/core/hub-client.php": "025f6533bcd9f7a58ededf5e5bbe8c851bed7e465fa1206d1e03a57e952dd2e7",
+    "/core/inquiry-db.php": "4b8e325481fc114d41f14763eb461ee810f8439e1754c4c4365b1077712b197e",
+    "/core/inquiry-engine.php": "f1b4d83b70634df7f372cf708c06a713b96d0a0131d626128b9c91af60794dbf",
+    "/core/legal-registry.php": "a4495e5499b35ff94596c2bd0427716b87e347931bd29392ab7acfb57f3a4beb",
+    "/core/release-server.php": "4ff6424e8fd9b18de611854fd2691689cc064297c2def954d9ecc9cc6a6a4d51",
+    "/core/render.php": "8e6e870147f969df5d8ff77f98936e2f685ecd0aa02f18b643626730f1f97da0",
+    "/core/router.php": "963824599979c3e5f24b2e95b2bceea59aea9be7290fe00b2a3d827f2d2053b2",
+    "/core/schema-graph.php": "0f696faacfa06458719b82d650dc88c04ced05cc49c9a85a9bddfe8aa1687bb2",
+    "/core/security.php": "dc715ed466b66f8edca734ed5919e3637f82011f18fa3cfd662e04a9ed4edbe7",
+    "/public/assets/js/lumora-core.js": "49296035c5052e2becd882c8e41c5126612eee08002ed0135cf5adb1fdb9f19f"
+  },
+  "sri": {
+    "/public/assets/css/lumora.min.css": "sha384-Cl6m82/SkHtmRagrzbpeBYW1pmyah/C1AuAYrY90bXIaeXmq8cENm6sNa9oI4qY2",
+    "/public/assets/js/lumora-core.js": "sha384-5wQYjQXhf4Ob7XWAH5d4r4N83cHCLIosG4y0INWgN5E3LW2m8z6oYpK+06/76wyA"
+  }
+}

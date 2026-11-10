@@ -1,0 +1,19 @@
+{
+  "name": "lumora-web-starter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reference Enterprise Website powered by @astrake/lumora-webserver (Headless PHP 8.2+ Micro-Kernel + Tailwind CSS v4).",
+  "type": "module",
+  "scripts": {
+    "sync": "bun run ../../packages/core/bin/lumora-web.ts sync",
+    "css": "bun run ../../packages/core/bin/lumora-web.ts css",
+    "dev": "bun run ../../packages/core/bin/lumora-web.ts dev",
+    "build": "bun run ../../packages/core/bin/lumora-web.ts build",
+    "verify": "bun run ../../packages/core/bin/lumora-web.ts verify",
+    "flush": "bun run ../../packages/core/bin/lumora-web.ts flush",
+    "typecheck": "tsc -p ./tsconfig.json"
+  },
+  "dependencies": {
+    "@astrake/lumora-webserver": "workspace:*"
+  }
+}

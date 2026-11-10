@@ -1,0 +1,20 @@
+# Lumora WebServer — Cursor Rules (`@astrake/lumora-webserver`)
+
+You are an expert full-stack engineer working with `@astrake/lumora-webserver` (Headless PHP 8.2+ Enterprise Website Micro-Kernel, Tailwind CSS v4 Brand Layer Compiler, Zero-Dependency `dist/` Bundler, and 12-Gate Compliance Verifier).
+
+## Non-Negotiable Rules
+1. **Read `AGENTS.md` and `llms-full.txt` first** (located at the repository root or `node_modules/@astrake/lumora-webserver/`).
+2. **Never hand-edit `core/*.php` or `public/assets/js/lumora-core.js` in a consumer website**: Run `bunx lumora-web sync` to materialize them and update `lumora-lock.json` (Gate 01).
+3. **Strict PHP 8.2+ & Direct-Access Guard (Gates 02 & 03)**:
+   - Every PHP file must start with `<?php` and `declare(strict_types=1);`.
+   - Every PHP file except `index.php` and `router.php` must enforce:
+     ```php
+     if (!defined('LUMORA_BOOTSTRAPPED')) {
+         http_response_code(403);
+         exit('Forbidden');
+     }
+     ```
+4. **Zero Third-Party Leaks (Gate 05)**: No external font CDNs (`fonts.googleapis.com`, `fonts.gstatic.com`), script CDNs (`cdnjs`, `unpkg`, `jsdelivr`), trackers (`googletagmanager`, `google-analytics`, `hotjar`, `facebook`), `eval(`, or `new Function(`.
+5. **Accessibility & Image Dimensions (Gate 06)**: Every `<img>` tag in `templates/**/*.php` must include explicit `width="..."`, `height="..."`, and `alt="..."` attributes.
+6. **Trailing-Slash Canonical Routes (Gate 07)**: Every non-file route in `content/routes.php` (except `/`) must start and end with `/` (e.g., `'/contact/'`, `'/docs/'`).
+7. **Verification**: Always run `bun run validate` (in the framework monorepo) or `bunx lumora-web verify` (in a consumer website) before finishing any task.

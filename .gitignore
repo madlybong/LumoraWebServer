@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+bun.lockb
+
+# Build outputs
+dist/
+packages/*/dist/
+apps/*/dist/
+
+# Runtime storage vaults & SQLite WAL files
+storage/
+apps/*/storage/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+*.db-shm
+*.db-wal
+*.jsonl
+*.log
+
+# Scratch & temporary files
+tools/scratch/
+*.tgz
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example

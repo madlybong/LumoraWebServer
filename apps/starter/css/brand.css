@@ -1,0 +1,83 @@
+@import "@astrake/lumora-webserver/runtime/css/lumora-base.css";
+@import "./brand-theme.css";
+
+@layer components {
+  body {
+    margin: 0;
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    line-height: 1.6;
+  }
+
+  .site-shell {
+    max-width: var(--site-max-width);
+    margin: 0 auto;
+    padding: 0 var(--gutter-horizontal);
+  }
+
+  .site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--header-height);
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface);
+  }
+
+  .site-nav {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+  }
+
+  .site-nav a {
+    color: var(--color-ink);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9375rem;
+  }
+
+  .hero-section {
+    padding: var(--section-padding-y) 0;
+  }
+
+  .card-surface {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-surface-inv);
+    color: var(--color-ink-inv);
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.375rem;
+    border: 0;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  .form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    margin-bottom: 1rem;
+  }
+
+  .form-field input,
+  .form-field select,
+  .form-field textarea {
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.375rem;
+    font-family: inherit;
+    font-size: 1rem;
+  }
+}

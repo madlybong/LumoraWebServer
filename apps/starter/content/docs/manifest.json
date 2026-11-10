@@ -1,0 +1,22 @@
+{
+  "version": "0.1.0",
+  "tracks": {
+    "operator": {
+      "id": "operator",
+      "title": "Framework Architecture & Operations",
+      "badge": "CORE",
+      "audience": "Engineers & Site Operators",
+      "summary": "Deterministic guides for building, verifying, and deploying zero-dependency PHP 8.2+ enterprise websites.",
+      "articles": [
+        {
+          "slug": "getting-started",
+          "title": "Getting Started with @astrake/lumora-webserver",
+          "summary": "Configure lumora.config.php, sync the headless micro-kernel, compile Tailwind CSS v4, and pass all 12 compliance gates.",
+          "file": "getting-started.md",
+          "reading_time": "3 min read",
+          "tags": ["CLI", "Security", "Tailwind v4"]
+        }
+      ]
+    }
+  }
+}

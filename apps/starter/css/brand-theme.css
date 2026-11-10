@@ -1,0 +1,10 @@
+@theme {
+  --color-canvas: #fafafa;
+  --color-surface: #ffffff;
+  --color-surface-inv: #09090b;
+  --color-ink: #09090b;
+  --color-ink-inv: #ffffff;
+  --color-muted: #52525b;
+  --color-accent: #0055ff;
+  --color-border: #e4e4e7;
+}
