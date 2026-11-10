@@ -1,9 +1,19 @@
 # Changelog
 
+## Unreleased
+
+---
+
+## [0.1.1] — 2026-11-11
+
+### Maintenance
+
+- Enable npm Trusted Publishing (OIDC) and SLSA provenance attestation in `.github/workflows/release.yml`.
+- Upgrade CI/Release setup-bun to `1.4.4` for `lockfileVersion: 2` compatibility.
+
 All notable changes to `@astrake/lumora-webserver` are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Commits: [Conventional Commits](https://www.conventionalcommits.org/)
 
-## Unreleased
 
 ---
 

@@ -1,6 +1,6 @@
 {
   "name": "lumora-webserver-workspace",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Monorepo workspace for @astrake/lumora-webserver — Headless PHP 8.2+ Enterprise Website Micro-Kernel, Tailwind CSS v4 Compiler, Zero-Dependency dist/ Bundler, and 12-Gate Compliance Verifier.",
   "author": "Anuvab Chakraborty (https://github.com/madlybong)",

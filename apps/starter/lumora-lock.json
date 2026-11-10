@@ -1,6 +1,6 @@
 {
   "framework": "@astrake/lumora-webserver",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "core_sha256": {
     "/core/blog-engine.php": "e2b3f8301f014daf69f22775243d1a531b0fb61d4fa2769ea59086cc135dad62",
     "/core/bootstrap.php": "fa0dc020e5f1f27619a034f55a013306d621cb301b76d2f714421e5f99b588c4",
