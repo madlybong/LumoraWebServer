@@ -74,12 +74,17 @@ gh workflow run release.yml -R madlybong/LumoraWebServer
 | Scope | `@astrake` |
 | Access | `public` |
 
-**Required GitHub secret:** `NPM_TOKEN` (same `@astrake` publish token used in `LumoraServer`)
+### Authentication Modes Supported by `.github/workflows/release.yml`
 
-Add it at: `https://github.com/madlybong/LumoraWebServer/settings/secrets/actions` (or via `gh secret set NPM_TOKEN -R madlybong/LumoraWebServer`).
+1. **npm Trusted Publishing (OIDC — Recommended, Zero Secrets):**
+   - Configured at `https://www.npmjs.com/package/@astrake/lumora-webserver/access` → **Trusted Publisher** (`madlybong/LumoraWebServer`, workflow `release.yml`).
+   - Uses `id-token: write` and Node 24 (`npm@11`) with `--provenance` to sign and publish a Sigstore SLSA provenance statement.
+   - Supports both **direct publishing** (`Permissions: npm publish`) and **staged publishing** (`Permissions: npm stage publish` — automatically falls back to `npm stage publish *.tgz --access public --provenance` when stage-only permission is configured on npmjs.com).
+2. **`NPM_TOKEN` Secret Fallback:**
+   - Optional repository secret `NPM_TOKEN` at `https://github.com/madlybong/LumoraWebServer/settings/secrets/actions`.
 
 > [!IMPORTANT]
-> Keep `.npmrc` at the monorepo root only (never inside `packages/core/`). Inside GitHub Actions, `actions/setup-node@v4` configures `$NPM_CONFIG_USERCONFIG` with `scope: '@astrake'` and `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}`, and `npm publish *.tgz --access public` publishes the packed tarball without triggering npm workspace `ENOWORKSPACES` errors.
+> Keep `.npmrc` at the monorepo root only (never inside `packages/core/`). Inside GitHub Actions, `release.yml` packs the standalone tarball via `bun pm pack` and publishes before creating Git tags or GitHub Releases so GitHub and npm versions never drift out of sync.
 
 ---
 
