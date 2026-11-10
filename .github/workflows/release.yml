@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: write   # required to create GitHub Releases and push tags
+  id-token: write   # required for npm Trusted Publishing (OIDC) & provenance
 
 jobs:
   release:
@@ -126,7 +127,10 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if [ -z "${NODE_AUTH_TOKEN}" ]; then
-            echo "Error: NODE_AUTH_TOKEN is empty! Please check repository secret NPM_TOKEN."
-            exit 1
+            echo "No NPM_TOKEN set — publishing via npm Trusted Publishing (OIDC)..."
+            npm install -g npm@latest
+            rm -f "${NPM_CONFIG_USERCONFIG}"
+            npm publish *.tgz --access public --provenance
+          else
+            npm publish *.tgz --access public --provenance
           fi
-          npm publish *.tgz --access public
