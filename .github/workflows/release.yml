@@ -116,7 +116,18 @@ jobs:
             if [ ${PUBLISH_CODE} -ne 0 ]; then
               if echo "${PUBLISH_OUT}" | grep -q "OIDC permission denied for this action"; then
                 echo "Trusted Publisher is configured with 'npm stage publish' permission — staging release via OIDC..."
-                npm stage publish *.tgz --access public --provenance
+                set +e
+                STAGE_OUT=$(npm stage publish *.tgz --access public --provenance 2>&1)
+                STAGE_CODE=$?
+                echo "${STAGE_OUT}"
+                set -e
+                if [ ${STAGE_CODE} -ne 0 ]; then
+                  if echo "${STAGE_OUT}" | grep -q "Cannot stage previously published version"; then
+                    echo "✓ @astrake/lumora-webserver@${PKG_VERSION} is already staged on npm — skipping duplicate stage."
+                  else
+                    exit ${STAGE_CODE}
+                  fi
+                fi
               else
                 exit ${PUBLISH_CODE}
               fi
