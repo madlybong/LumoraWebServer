@@ -7,7 +7,7 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="<?= e($config['brand']['locale'] ?? 'en-IN') ?>">
+<html lang="<?= e($config['brand']['locale'] ?? 'en') ?>">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

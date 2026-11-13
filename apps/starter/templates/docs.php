@@ -6,7 +6,7 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
     exit('Forbidden');
 }
 
-use Astrake\Lumora\Core\DocsEngine;
+use Lumora\Core\DocsEngine;
 
 $docsEngine = new DocsEngine();
 $manifest = $doc_manifest ?? $docsEngine->getManifest();

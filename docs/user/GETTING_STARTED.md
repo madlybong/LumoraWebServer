@@ -21,20 +21,20 @@ cd my-brand-website
 bun init -y
 bun add -D @astrake/lumora-webserver
 bunx lumora-web init \
-  --brand-id "auruvi" \
-  --brand-name "Auruvi HMS" \
-  --prefix "AUR" \
-  --domain "auruvi.com" \
-  --entity "Astrake India"
+  --brand-id "acme" \
+  --brand-name "Acme Studio" \
+  --prefix "ACM" \
+  --domain "acme.example.com" \
+  --entity "Acme Studio LLC"
 ```
 
 ### What `lumora-web init` Creates
-- `lumora.config.php`: Pre-populated brand identity, security, asset, Hub, legal, and feature flags.
+- `lumora.config.php`: Pre-populated brand identity, security, discovery, asset, Hub, legal (`GLOBAL`, `['privacy', 'terms']`), and feature flags.
 - `index.php`, `router.php`, `.htaccess`: Canonical front controller, local `php -S` dev router, and Apache/cPanel security rules.
-- `core/*.php`: All 16 headless PHP 8.2+ runtime modules.
+- `core/*.php`: All 13 headless PHP 8.2+ runtime modules (`Lumora\Core`, with legacy `Astrake\Lumora\Core` alias).
 - `lumora-lock.json`: Cryptographic SHA-256 core checksums and SHA-384 asset SRI hashes.
 - `css/brand-theme.css` & `css/brand.css`: Brand design tokens and component styles compiled into `public/assets/css/lumora.min.css`.
-- `content/routes.php` & `content/channels.php`: Initial route table and inquiry channel definitions.
+- `content/routes.php`, `content/channels.php`, `content/legal/{privacy,terms}.php`: Initial route table, single `'general'` inquiry channel definition, and customizable legal starters.
 - `templates/`: Starter templates (`layout/head.php`, `layout/header.php`, `layout/footer.php`, `home.php`, `contact.php`, `legal.php`, `404.php`).
 - `package.json`, `.gitignore`, `AGENTS.md`, `.cursorrules`, and `LUMORA_SETUP.md`: Non-destructively merges standard `lumora-web` scripts (`sync`, `css`, `dev`, `build`, `verify`, `flush`), ignore rules, and AI coding rules.
 
@@ -44,7 +44,7 @@ To refactor an existing website repository in-place without clobbering existing 
 ```bash
 cd /path/to/existing-website
 bun add -D @astrake/lumora-webserver
-bunx lumora-web init --with-agents --brand-id "astrake" --brand-name "Astrake" --prefix "AST" --domain "astrake.com"
+bunx lumora-web init --with-agents --brand-id "my-site" --brand-name "My Site" --prefix "MYS" --domain "my-site.example.com"
 bunx lumora-web sync --force-stubs --with-agents
 bunx lumora-web css
 bunx lumora-web build
@@ -63,9 +63,9 @@ bunx lumora-web dev --port 8080
 
 Open `http://127.0.0.1:8080/` in your browser:
 - `/` renders `templates/home.php`
-- `/contact/` renders `templates/contact.php` (with live CSRF, honeypot, and SQLite WAL persistence)
-- `/legal/privacy/`, `/legal/terms/`, `/legal/cookies/`, `/legal/accessibility/`, `/legal/security/`, `/legal/company/` render statutory legal disclosures via `templates/legal.php`
-- `/health`, `/robots.txt`, `/sitemap.xml`, `/llms.txt`, `/llms-full.txt`, `/.well-known/security.txt`, and `/site.webmanifest` are served automatically
+- `/contact/` renders `templates/contact.php` (with live CSRF, honeypot, first-party attribution capture, and SQLite WAL persistence)
+- `/legal/privacy/` and `/legal/terms/` render active legal disclosures via `templates/legal.php` (additional slugs or `IN`/`EU`/`UK`/`US` statutory clauses are opt-in via `lumora.config.php` and `content/legal/{slug}.php`)
+- `/health`, `/robots.txt`, `/sitemap.xml`, `/llms.txt`, `/llms-full.txt`, and `/site.webmanifest` are served automatically (`/.well-known/security.txt` is served when `security_email`, `.well-known/security.txt`, or `discovery.security_txt => true` is configured)
 
 ---
 

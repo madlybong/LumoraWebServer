@@ -6,7 +6,7 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
     exit('Forbidden');
 }
 
-use Astrake\Lumora\Core\BlogEngine;
+use Lumora\Core\BlogEngine;
 
 $pageNum = (int)($page_num ?? 1);
 $paginated = BlogEngine::paginate($pageNum, 10);
@@ -22,7 +22,7 @@ component('layout/header', ['config' => $config ?? []]);
     <?php foreach ($paginated['items'] as $post): ?>
         <article class="card-surface">
             <p style="font-family:var(--font-mono);font-size:0.75rem;color:var(--color-muted);margin:0 0 0.25rem;">
-                <?= e($post['date'] ?? '') ?> · <?= e($post['author'] ?? 'Astrake') ?>
+                <?= e($post['date'] ?? '') ?> · <?= e($post['author'] ?? ($config['brand']['name'] ?? 'Maintainers')) ?>
             </p>
             <h2 style="margin:0 0 0.5rem;">
                 <a href="<?= e(u('/blog/' . ($post['slug'] ?? '') . '/')) ?>" style="color:inherit;text-decoration:none;">

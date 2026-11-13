@@ -22,7 +22,7 @@ bun run validate
 
 | Directory | Package / Purpose |
 | :--- | :--- |
-| `packages/core/runtime/php/core/` | The 13 headless PHP 8.2+ runtime classes (`Astrake\Lumora\Core`). |
+| `packages/core/runtime/php/core/` | The 13 headless PHP 8.2+ runtime classes (`Lumora\Core`, with legacy `Astrake\Lumora\Core` alias). |
 | `packages/core/runtime/php/stubs/` | Canonical root stubs (`index.stub.php`, `router.stub.php`, `htaccess.stub.conf`, `nginx.stub.conf`). |
 | `packages/core/runtime/css/` | `lumora-base.css` (Tailwind CSS v4 entry + `@theme` structural primitives + accessibility rules). |
 | `packages/core/runtime/js/` | `lumora-core.js` (Client ES module for motion tiering, mobile navigation, and form validation). |
@@ -38,7 +38,7 @@ bun run validate
 1. **Strict PHP 8.2+ & Bootstrap Isolation:**
    - Every PHP file in `packages/core/runtime/php/core/` and `apps/starter/` must declare `declare(strict_types=1);` immediately after `<?php`.
    - Every PHP file outside `index.stub.php` and `router.stub.php` must enforce the `LUMORA_BOOTSTRAPPED` guard (`if (!defined('LUMORA_BOOTSTRAPPED')) { http_response_code(403); exit('Forbidden'); }`).
-   - When a core PHP file defines both classes in `Astrake\Lumora\Core` and global procedural helpers (`e()`, `u()`, `lumora_csrf_token()`, etc.), wrap both blocks in bracketed namespace declarations (`namespace Astrake\Lumora\Core { ... }` and `namespace { ... }`).
+   - When a core PHP file defines both classes in `Lumora\Core` and global procedural helpers (`e()`, `u()`, `lumora_csrf_token()`, etc.), wrap both blocks in bracketed namespace declarations (`namespace Lumora\Core { ... }` and `namespace { ... }`) and provide a backward-compatible `class_alias(\Lumora\Core\<Class>::class, \Astrake\Lumora\Core\<Class>::class)`.
 2. **Zero Brand Hardcoding in `packages/core/runtime/`:**
    - Never hardcode brand-specific routes, inquiry fields, or entity details in `packages/core/runtime/`. Everything must be parameterized via `lumora.config.php`, `content/routes.php`, `content/channels.php`, and `content/legal/{slug}.php`.
 3. **Syncing Changes to `apps/starter`:**

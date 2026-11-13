@@ -117,3 +117,28 @@ export function loadPhpSiteRoutes(siteRoot: string): {
   `;
   return evalPhpJson(script, siteRoot);
 }
+
+export function loadPhpLegalSlugs(siteRoot: string): string[] {
+  const cfg = loadPhpSiteConfig(siteRoot);
+  const features = (cfg.features ?? {}) as Record<string, unknown>;
+  if (features.legal_registry === false) {
+    return [];
+  }
+
+  const siteRegistry = path.join(siteRoot, "core", "legal-registry.php");
+  const registryFile = existsSync(siteRegistry)
+    ? siteRegistry
+    : path.join(resolveRuntimeDir(), "php", "core", "legal-registry.php");
+
+  if (!existsSync(registryFile)) {
+    return [];
+  }
+
+  const script = `
+    define('LUMORA_BOOTSTRAPPED', true);
+    require_once ${JSON.stringify(toPosixPath(registryFile))};
+    $cfg = require ${JSON.stringify(toPosixPath(path.join(siteRoot, "lumora.config.php")))};
+    echo json_encode(\\Lumora\\Core\\LegalRegistry::activeSlugs(is_array($cfg) ? $cfg : [], ${JSON.stringify(toPosixPath(siteRoot))}), JSON_UNESCAPED_SLASHES);
+  `;
+  return evalPhpJson<string[]>(script, siteRoot);
+}

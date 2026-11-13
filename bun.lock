@@ -14,14 +14,14 @@
     },
     "apps/starter": {
       "name": "lumora-web-starter",
-      "version": "0.1.0",
+      "version": "0.1.2",
       "dependencies": {
         "@astrake/lumora-webserver": "workspace:*",
       },
     },
     "packages/core": {
       "name": "@astrake/lumora-webserver",
-      "version": "0.1.0",
+      "version": "0.1.2",
       "bin": {
         "lumora-web": "./dist/bin/lumora-web.js",
       },

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Astrake\Lumora\Core;
+namespace Lumora\Core;
 
 if (!defined('LUMORA_BOOTSTRAPPED')) {
     http_response_code(403);
@@ -406,4 +406,11 @@ final class DocsEngine
 
         return $escaped;
     }
+}
+
+if (
+    class_exists(\Lumora\Core\DocsEngine::class, false)
+    && !class_exists(\Astrake\Lumora\Core\DocsEngine::class, false)
+) {
+    class_alias(\Lumora\Core\DocsEngine::class, \Astrake\Lumora\Core\DocsEngine::class);
 }

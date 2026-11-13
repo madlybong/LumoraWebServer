@@ -8,4 +8,4 @@ define('LUMORA_BOOTSTRAPPED', true);
 
 require_once __DIR__ . '/core/bootstrap.php';
 
-\Astrake\Lumora\Core\Bootstrap::handleRequest(__DIR__);
+\Lumora\Core\Bootstrap::handleRequest(__DIR__);

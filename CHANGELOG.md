@@ -4,6 +4,18 @@
 
 ---
 
+## [0.1.2] — 2026-11-14
+
+### Changed
+- **Standardized PHP Core Namespace (`Lumora\Core`):** Migrated all 13 PHP core classes from `Astrake\Lumora\Core` to `Lumora\Core` while registering backward-compatible `class_alias(\Lumora\Core\<Class>::class, \Astrake\Lumora\Core\<Class>::class)` declarations across every module.
+- **De-Branded Security Layer:** Removed hardcoded legacy bootstrap constants and globals (`ASTRAKE_*`, `AURUVI_*`, `DRISVA_*`, `ORINA_WEB_BOOTSTRAPPED`) from `Security::boot()` in favor of opt-in `security.compat_constants` validated against `/^[A-Z][A-Z0-9_]{2,63}$/`.
+- **App-Driven `LegalRegistry` & Globally Neutral Defaults:** Switched default legal configuration to `territories: ['GLOBAL']`, `slugs: ['privacy', 'terms']`, optional `brand.legal_entity`, empty default `address`, and neutral `[REDACTED]` pruning tokens. Added support for `legal.slugs`, `legal.include_default_slugs`, custom `content/legal/{slug}.php` documents without forced statutory boilerplate, `features.legal_registry = false` toggle, and `LegalRegistry::activeSlugs()`.
+- **Universal `SchemaGraph` & Configurable `Discovery`:** Added `schema_org_type` (`Person` / `Organization` / `LocalBusiness`), opt-in `legalName`, `sameAs`, custom `contact_points`, optional `PostalAddress`, opt-in `SoftwareApplication` (`primary_offering_schema`) & `Brand` (`emit_brand_node`), per-route `schema_nodes`, `framework_label`, `discovery.*` endpoint toggles (with conditional `<link>` rendering in `Render::headMeta()`), `content/llms.php` programmatic override, and automatic `BlogEngine` indexing in `/llms.txt`.
+- **App-Owned Channels, First-Party Attribution & Retention Opt-Out:** Removed hardcoded alias/referer merging in `InquiryEngine` when an app defines `channels`, added first-party `_attr_*` / UTM / CTA attribution extraction (plus `initFirstPartyAttribution()` in `lumora-core.js` and wire `schema_version` `1.1`), and updated `InquiryDb::prune()` so `retention_days_pii = 0` preserves submissions intact.
+- **Dynamic CLI, Scaffolder & 12-Gate Verifier:** Updated `lumora-web init` defaults (`acme` / RFC 2606 examples), `build-dist` legal stub generation (`loadPhpLegalSlugs()`), and Gates 05/08/09/10/12 to respect site feature and discovery toggles. Updated tests to cover Personal, Commercial, and Regulated Enterprise profiles.
+
+---
+
 ## [0.1.1] — 2026-11-11
 
 ### Maintenance

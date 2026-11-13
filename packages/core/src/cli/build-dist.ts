@@ -10,7 +10,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { compileBrandCss } from "./css-compiler";
-import { loadPhpSiteConfig, loadPhpSiteRoutes, resolveRuntimeDir, toPosixPath } from "./paths";
+import { loadPhpLegalSlugs, loadPhpSiteConfig, loadPhpSiteRoutes, resolveRuntimeDir, toPosixPath } from "./paths";
 import { syncWebsite } from "./sync";
 
 export interface BuildDistOptions {
@@ -139,8 +139,8 @@ export async function buildWebsiteDist(options: BuildDistOptions = {}): Promise<
     }
   }
 
-  // Always generate physical stubs for the 6 statutory legal routes
-  for (const legalSlug of ["privacy", "terms", "cookies", "accessibility", "security", "company"]) {
+  // Generate physical stubs for app-configured legal routes
+  for (const legalSlug of loadPhpLegalSlugs(siteRoot)) {
     canonicalRoutes.add(`/legal/${legalSlug}/`);
   }
 

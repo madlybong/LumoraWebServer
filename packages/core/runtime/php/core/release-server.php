@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Astrake\Lumora\Core;
+namespace Lumora\Core;
 
 if (!defined('LUMORA_BOOTSTRAPPED')) {
     http_response_code(403);
@@ -29,7 +29,7 @@ final class ReleaseServer
             } else {
                 $json = (string)json_encode([
                     'product'       => (string)($brand['name'] ?? 'Lumora'),
-                    'legalOwner'    => (string)($brand['legal_entity'] ?? 'Astrake India'),
+                    'legalOwner'    => (string)($brand['legal_entity'] ?? $brand['name'] ?? 'Lumora'),
                     'domain'        => (string)($brand['domain'] ?? 'localhost'),
                     'version'       => (string)($brand['version'] ?? '0.1.0'),
                     'installerMode' => 'offline-only',
@@ -145,4 +145,11 @@ final class ReleaseServer
         }
         return true;
     }
+}
+
+if (
+    class_exists(\Lumora\Core\ReleaseServer::class, false)
+    && !class_exists(\Astrake\Lumora\Core\ReleaseServer::class, false)
+) {
+    class_alias(\Lumora\Core\ReleaseServer::class, \Astrake\Lumora\Core\ReleaseServer::class);
 }

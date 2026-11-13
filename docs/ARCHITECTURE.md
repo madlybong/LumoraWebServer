@@ -109,10 +109,10 @@ flowchart TD
     S6 --> S7["7. Outbound Dispatch<br/>HubClient::syncInquiryToHub() + Edge SMTP/WhatsApp"]
 ```
 
-### Statutory Data Lifecycle Pruning (`InquiryDb::prune()`)
-On every write to `lumora.sqlite`, `InquiryDb::prune()` executes non-blocking retention maintenance:
-1. **DPDP Act 2023 Sec. 8(7) (Default 90 Days):** Redacts `full_name` (`[REDACTED-90D]`), `organization`, `email` (`redacted@lumora.invalid`), `phone`, `subject`, `message` (`[REDACTED AFTER STATUTORY RETENTION WINDOW]`), `facility_location`, `details_json`, and `user_agent` while preserving `receipt_id`, `channel`, and `ip_hash`.
-2. **CERT-In Directions (Default 180 Days):** Permanently deletes rows from `contact_submissions` and `contact_rate_limits` older than `180` days.
+### Configurable Data Lifecycle Pruning (`InquiryDb::prune()`)
+On every write to `lumora.sqlite`, `InquiryDb::prune()` executes non-blocking retention maintenance according to `lumora.config.php`:
+1. **PII Redaction (`legal.retention_days_pii`, default `90`, `0` disables):** Redacts `full_name` (`[REDACTED]`), `organization`, `email` (`redacted@lumora.invalid`), `phone`, `subject`, `message` (`[REDACTED AFTER CONFIGURED RETENTION WINDOW]`), `facility_location`, `details_json`, and `user_agent` while preserving `receipt_id`, `channel`, and `ip_hash`. Setting `0` or `null` disables automated PII redaction and preserves `contact_submissions` rows.
+2. **Log Purge (`legal.retention_days_logs`, default `180`, `0` disables):** Permanently deletes `contact_rate_limits` entries (and expired `contact_submissions` rows when PII redaction is active) older than the configured window.
 
 ---
 

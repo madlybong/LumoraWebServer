@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Astrake\Lumora\Core;
+namespace Lumora\Core;
 
 if (!defined('LUMORA_BOOTSTRAPPED')) {
     http_response_code(403);
@@ -138,4 +138,11 @@ XML;
 {$entriesXml}</feed>
 XML;
     }
+}
+
+if (
+    class_exists(\Lumora\Core\BlogEngine::class, false)
+    && !class_exists(\Astrake\Lumora\Core\BlogEngine::class, false)
+) {
+    class_alias(\Lumora\Core\BlogEngine::class, \Astrake\Lumora\Core\BlogEngine::class);
 }

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Astrake\Lumora\Core {
+namespace Lumora\Core {
 
 if (!defined('LUMORA_BOOTSTRAPPED')) {
     http_response_code(403);
@@ -262,7 +262,14 @@ final class Router
 }
 
 namespace {
-    use Astrake\Lumora\Core\Router;
+    if (
+        class_exists(\Lumora\Core\Router::class, false)
+        && !class_exists(\Astrake\Lumora\Core\Router::class, false)
+    ) {
+        class_alias(\Lumora\Core\Router::class, \Astrake\Lumora\Core\Router::class);
+    }
+
+    use Lumora\Core\Router;
 
     if (!function_exists('lumora_base_path')) {
         function lumora_base_path(): string

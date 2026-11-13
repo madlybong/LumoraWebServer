@@ -11,7 +11,7 @@ return [
     'title'   => 'Internal Draft Architecture Note (Localhost Only)',
     'date'    => '2026-11-10',
     'status'  => 'draft',
-    'author'  => 'Astrake Engineering',
+    'author'  => 'Lumora Maintainers',
     'summary' => 'This draft article is gated to localhost and never appears in production feeds or sitemaps.',
     'body'    => '<p>Localhost-only draft content.</p>',
 ];

@@ -13,13 +13,12 @@ mkdir my-brand-website && cd my-brand-website
 bun init -y
 bun add -D @astrake/lumora-webserver
 
-# 1. Scaffold a new brand website
+# 1. Scaffold a new website
 bunx lumora-web init \
-  --brand-id "auruvi" \
-  --brand-name "Auruvi HMS" \
-  --prefix "AUR" \
-  --domain "auruvi.com" \
-  --entity "Astrake India"
+  --brand-id "acme" \
+  --brand-name "Acme Studio" \
+  --prefix "ACM" \
+  --domain "acme.example.com"
 
 # 2. Start local PHP 8.2+ dev server with live Tailwind v4 + SRI watcher
 bunx lumora-web dev --port 8080
@@ -39,7 +38,7 @@ bunx lumora-web verify
 - [**Production Deployment (`docs/user/DEPLOYMENT.md`)**](./docs/user/DEPLOYMENT.md): Deploying `dist/` to Apache/cPanel/LiteSpeed, Nginx/aaPanel, Cloudflare/reverse proxies, and configuring Edge SMTP/WhatsApp or Central Hub sync.
 
 ### Architecture & Framework Developer Guides
-- [**Project Overview (`docs/PROJECT.md`)**](./docs/PROJECT.md): Ecosystem positioning, architectural principles, and statutory compliance matrix (OWASP ASVS v4.0 L2, DPDP Act 2023, GDPR, CERT-In 2022, WCAG 2.2 AA).
+- [**Project Overview (`docs/PROJECT.md`)**](./docs/PROJECT.md): Ecosystem positioning, architectural principles, and compliance posture (OWASP ASVS v4.0 L2, configurable privacy/retention controls, WCAG 2.2 AA).
 - [**System Architecture (`docs/ARCHITECTURE.md`)**](./docs/ARCHITECTURE.md): Request lifecycle, physical zero-rewrite route stubs, CGNAT-safe stateless v2 CSRF, SQLite3 WAL + JSONL persistence, and CSS/SRI compilation.
 - [**Contributing Guide (`docs/developer/CONTRIBUTING.md`)**](./docs/developer/CONTRIBUTING.md): Monorepo structure, PHP 8.2+ & TypeScript coding conventions, and release workflow.
 - [**Testing & 12-Gate Verifier (`docs/developer/TESTING.md`)**](./docs/developer/TESTING.md): Test suite breakdown and troubleshooting guide for all 12 compliance gates.
@@ -53,12 +52,12 @@ bunx lumora-web verify
 
 ## 3. Core Capabilities
 
-1. **Zero-Dependency PHP 8.2+ Headless Micro-Kernel (`runtime/php/core/`):**
-   - **Security (`security.php`):** Emits 8 mandatory OWASP ASVS v4.0 Level 2 HTTP headers, per-request 128-bit CSPRNG CSP nonces, HMAC-derived local storage vaults (`storage/vault-<hmac>/`), and CGNAT-resilient stateless v2 HMAC-SHA256 CSRF tokens (`{tsHex}.{nonceHex}.{mac}`).
-   - **Routing & Discovery (`router.php`, `discovery.php`):** Enforces canonical trailing slashes (`301`), subfolder base-path resolution, and auto-serves `/health`, `/robots.txt`, `/sitemap.xml`, `/llms.txt`, `/llms-full.txt`, `/.well-known/security.txt`, `/site.webmanifest`, and `POST /_lumora/outbox/flush`.
-   - **SEO & Schema.org (`render.php`, `schema-graph.php`):** Deterministic Schema.org JSON-LD `@graph` builder (`Organization`, `Brand`, `WebSite`, `SoftwareApplication`, `BreadcrumbList`, `ContactPage`, `TechArticle`, `BlogPosting`, `WebPage`, `FAQPage`) and automatic SHA-384 Subresource Integrity (SRI) + `?v=<hash8>` cache-busting from `lumora-lock.json`.
-   - **Declarative Inquiry Engine & SQLite WAL Vault (`inquiry-engine.php`, `inquiry-db.php`, `hub-client.php`):** Pre-CSRF rate limiting (`5 / 900s`), honeypot (`reject` or `fake_receipt`), `<2s` timing guard, declarative custom channel fields (`content/channels.php`), `<1ms` SQLite3 WAL + atomic JSONL persistence, 90-day DPDP Act 2023 PII redaction, 180-day CERT-In log purge, standalone Edge notifications (native SMTP + self-hosted WAHA/Evolution/Webhook WhatsApp), and optional HMAC-SHA256 webhook outbox sync.
-   - **Parameterized Territory Legal Registry (`legal-registry.php`):** Generates statutory compliance documents (`privacy`, `terms`, `cookies`, `accessibility`, `security`, `company`) parameterized by territory (`IN`, `EU`, `UK`, `US`, `GLOBAL`) with full project-level customization in `content/legal/{slug}.php`.
+1. **Zero-Dependency PHP 8.2+ Headless Micro-Kernel (`Lumora\Core`, with legacy `Astrake\Lumora\Core` class alias):**
+   - **Security (`security.php`):** Emits 8 mandatory OWASP ASVS v4.0 Level 2 HTTP headers, per-request 128-bit CSPRNG CSP nonces, HMAC-derived local storage vaults (`storage/vault-<hmac>/`), and CGNAT-resilient stateless v2 HMAC-SHA256 CSRF tokens (`{tsHex}.{nonceHex}.{mac}`). Supports opt-in `security.compat_constants`.
+   - **Routing & Discovery (`router.php`, `discovery.php`):** Enforces canonical trailing slashes (`301`), subfolder base-path resolution, and configurable discovery endpoints (`/health`, `/robots.txt`, `/sitemap.xml`, `/llms.txt` with `BlogEngine` post indexing & `content/llms.php` overrides, `/llms-full.txt`, `/.well-known/security.txt`, `/site.webmanifest`, and `POST /_lumora/outbox/flush`).
+   - **SEO & Schema.org (`render.php`, `schema-graph.php`):** Deterministic Schema.org JSON-LD `@graph` builder (`Organization`, `Person`, `LocalBusiness`, optional `Brand` / `SoftwareApplication`, `WebSite`, `BreadcrumbList`, `ContactPage`, `TechArticle`, `BlogPosting`, `WebPage`, `FAQPage`, plus per-route `schema_nodes`) and automatic SHA-384 Subresource Integrity (SRI) + `?v=<hash8>` cache-busting from `lumora-lock.json`.
+   - **Declarative Inquiry Engine & SQLite WAL Vault (`inquiry-engine.php`, `inquiry-db.php`, `hub-client.php`):** Pre-CSRF rate limiting (`5 / 900s`), honeypot (`reject` or `fake_receipt`), `<2s` timing guard, app-owned channels (`content/channels.php`) without core alias injection, first-party UTM & CTA attribution capture (`initFirstPartyAttribution()`), `<1ms` SQLite3 WAL + atomic JSONL persistence, configurable PII/log retention pruning (`[REDACTED]`, `0` disables pruning), standalone Edge notifications (native SMTP + self-hosted WAHA/Evolution/Webhook WhatsApp), and optional HMAC-SHA256 webhook outbox sync (`schema_version` `1.0` / `1.1`).
+   - **App-Driven Legal Registry (`legal-registry.php`):** Globally neutral defaults (`'GLOBAL'`, `['privacy', 'terms']`) with opt-in regional compliance templates (`IN`, `EU`, `UK`, `US`), custom `content/legal/{slug}.php` documents, configurable `legal.slugs`, and `features.legal_registry = false` toggle.
    - **Content & Release Engines (`docs-engine.php`, `blog-engine.php`, `release-server.php`):** Manifest-jailed Markdown documentation engine (with `dist/` manifest inlining), file-based blog engine with localhost draft gating and Atom 1.0 feed, and RFC 9110 `Range` (`206 Partial Content`) binary artifact server with `X-Checksum-Sha256`.
 
 2. **Tailwind CSS v4 + Brand Design Layer (`runtime/css/lumora-base.css`):**

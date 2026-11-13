@@ -17,17 +17,19 @@ export interface InitWebsiteOptions {
 
 export async function initWebsite(options: InitWebsiteOptions = {}): Promise<void> {
   const siteRoot = path.resolve(options.cwd ?? process.cwd());
-  const brandId = options.brandId ?? "lumora";
-  const brandName = options.brandName ?? "Lumora Enterprise";
-  const brandPrefix = options.brandPrefix ?? "LUM";
-  const domain = options.domain ?? "lumora.astrake.com";
-  const legalEntity = options.legalEntity ?? "Astrake India";
+  const brandId = options.brandId ?? "my-site";
+  const brandName = options.brandName ?? "My Brand";
+  const brandPrefix = options.brandPrefix ?? "SITE";
+  const domain = options.domain ?? "example.com";
+  const legalEntity = options.legalEntity?.trim() || "";
 
   mkdirSync(path.join(siteRoot, "css"), { recursive: true });
-  mkdirSync(path.join(siteRoot, "content"), { recursive: true });
+  mkdirSync(path.join(siteRoot, "content", "legal"), { recursive: true });
   mkdirSync(path.join(siteRoot, "templates", "layout"), { recursive: true });
   mkdirSync(path.join(siteRoot, "public", "brand"), { recursive: true });
   mkdirSync(path.join(siteRoot, "public", "fonts"), { recursive: true });
+
+  const legalEntityLine = legalEntity !== "" ? `\n        'legal_entity'  => '${legalEntity}',` : "";
 
   const configPath = path.join(siteRoot, "lumora.config.php");
   if (!existsSync(configPath)) {
@@ -45,24 +47,17 @@ return [
     'brand' => [
         'id'            => '${brandId}',
         'prefix'        => '${brandPrefix}',
-        'name'          => '${brandName}',
-        'legal_entity'  => '${legalEntity}',
+        'name'          => '${brandName}',${legalEntityLine}
         'domain'        => '${domain}',
         'origin'        => 'https://${domain}',
-        'version'       => '0.1.0',
-        'locale'        => 'en-IN',
+        'version'       => '0.1.2',
+        'locale'        => 'en',
         'theme_color'   => '#0a0a0a',
         'color_scheme'  => 'light',
         'category'      => 'BusinessApplication',
-        'slogan'        => 'Enterprise Website Powered by @astrake/lumora-webserver',
-        'contact_email' => 'office@${domain}',
-        'address'       => [
-            'street'      => 'Shop No 3, Ground Floor, 13B Bireswar Dhole Lane',
-            'locality'    => 'Kolkata',
-            'region'      => 'West Bengal',
-            'postal_code' => '700035',
-            'country'     => 'IN',
-        ],
+        'slogan'        => 'Web Platform Powered by Lumora',
+        'contact_email' => 'contact@${domain}',
+        'address'       => [],
     ],
     'security' => [
         'canonical_https_redirect' => true,
@@ -87,16 +82,20 @@ return [
         'fallback_notify' => true,
     ],
     'legal' => [
-        'territories'         => ['IN', 'EU', 'GLOBAL'],
-        'entity_type'         => 'Proprietorship',
-        'grievance_officer'   => 'Grievance & Data Protection Officer',
+        'territories'         => ['GLOBAL'],
+        'slugs'               => ['privacy', 'terms'],
         'retention_days_pii'  => 90,
         'retention_days_logs' => 180,
+    ],
+    'discovery' => [
+        'security_txt' => false,
     ],
     'features' => [
         'docs_engine'    => false,
         'blog_engine'    => false,
         'release_server' => false,
+        'legal_registry' => true,
+        'inquiry_engine' => true,
     ],
 ];
 `,
@@ -157,7 +156,7 @@ return [
             'template' => 'home',
             'meta'     => [
                 'title'       => '${brandName} — Overview',
-                'description' => 'Enterprise platform overview.',
+                'description' => '${brandName} overview and capabilities.',
                 'path'        => '/',
             ],
         ],
@@ -165,7 +164,7 @@ return [
             'template' => 'contact',
             'meta'     => [
                 'title'       => 'Contact — ${brandName}',
-                'description' => 'Direct enterprise inquiry and statutory request desk.',
+                'description' => 'Get in touch with ${brandName}.',
                 'path'        => '/contact/',
                 'schema_type' => 'contact',
             ],
@@ -199,27 +198,72 @@ return [
     'channels'        => [
         'general'  => [
             'code'        => 'CHN-01',
-            'label'       => 'Business & Architecture Inquiry',
-            'heading'     => 'Send an Inquiry',
-            'sla'         => '1 Business Day',
+            'label'       => 'General Inquiry',
+            'heading'     => 'Send a Message',
+            'sla'         => '1-2 Business Days',
             'button_text' => 'Submit Inquiry',
             'fields'      => [],
         ],
-        'security' => [
-            'code'        => 'CHN-02',
-            'label'       => 'Security Vulnerability Report',
-            'heading'     => 'Report a Security Issue',
-            'sla'         => '24 Hours',
-            'button_text' => 'Submit Security Report',
-            'fields'      => [],
+    ],
+];
+`,
+      "utf8"
+    );
+  }
+
+  const privacyLegalPath = path.join(siteRoot, "content", "legal", "privacy.php");
+  if (!existsSync(privacyLegalPath)) {
+    writeFileSync(
+      privacyLegalPath,
+      `<?php
+declare(strict_types=1);
+
+if (!defined('LUMORA_BOOTSTRAPPED')) {
+    http_response_code(403);
+    exit('Forbidden');
+}
+
+return [
+    'title'    => 'Privacy Policy',
+    'lead'     => 'How information submitted on this website is handled and protected.',
+    'sections' => [
+        [
+            'id'    => 'overview',
+            'title' => '1. Data Collection',
+            'body'  => '<p>This website operates without advertising trackers or third-party analytics cookies. Contact details are collected only when voluntarily submitted via forms.</p>',
         ],
-        'privacy'  => [
-            'code'        => 'CHN-03',
-            'label'       => 'Data Privacy & DPDP Rights',
-            'heading'     => 'Statutory Privacy Request',
-            'sla'         => '72 Hours',
-            'button_text' => 'Submit Privacy Request',
-            'fields'      => [],
+        [
+            'id'    => 'retention',
+            'title' => '2. Retention & Requests',
+            'body'  => '<p>To update or delete submitted contact information, reach out via the contact details listed on this website.</p>',
+        ],
+    ],
+];
+`,
+      "utf8"
+    );
+  }
+
+  const termsLegalPath = path.join(siteRoot, "content", "legal", "terms.php");
+  if (!existsSync(termsLegalPath)) {
+    writeFileSync(
+      termsLegalPath,
+      `<?php
+declare(strict_types=1);
+
+if (!defined('LUMORA_BOOTSTRAPPED')) {
+    http_response_code(403);
+    exit('Forbidden');
+}
+
+return [
+    'title'    => 'Terms of Use',
+    'lead'     => 'Terms governing access to this website and its content.',
+    'sections' => [
+        [
+            'id'    => 'usage',
+            'title' => '1. Acceptable Use',
+            'body'  => '<p>By accessing this website, you agree to use its pages and contact forms responsibly and in compliance with applicable laws.</p>',
         ],
     ],
 ];
@@ -246,7 +290,7 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="<?= e($config['brand']['locale'] ?? 'en-IN') ?>">
+<html lang="<?= e($config['brand']['locale'] ?? 'en') ?>">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -266,7 +310,9 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
     <nav aria-label="Primary Navigation">
         <a href="<?= e(u('/')) ?>"><?= e($config['brand']['name'] ?? 'Lumora') ?></a>
         <a href="<?= e(u('/contact/')) ?>">Contact</a>
-        <a href="<?= e(u('/legal/privacy/')) ?>">Privacy</a>
+        <?php if (in_array('privacy', \Lumora\Core\LegalRegistry::activeSlugs($config ?? []), true)): ?>
+            <a href="<?= e(u('/legal/privacy/')) ?>">Privacy</a>
+        <?php endif; ?>
     </nav>
 </header>
 `,
@@ -278,7 +324,7 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
 }
 ?>
 <footer>
-    <p>&copy; <?= gmdate('Y') ?> <?= e($config['brand']['legal_entity'] ?? 'Astrake India') ?>.</p>
+    <p>&copy; <?= gmdate('Y') ?> <?= e($config['brand']['legal_entity'] ?? ($config['brand']['name'] ?? 'Lumora')) ?>.</p>
 </footer>
 <?= lumora_core_script() ?>
 </body>

@@ -12,7 +12,7 @@ component('layout/header', ['config' => $config ?? []]);
 <main id="main-content" class="site-shell">
     <section class="hero-section">
         <p style="font-family:var(--font-mono);font-size:0.8125rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--color-muted);">
-            @astrake/lumora-webserver · v<?= e($config['brand']['version'] ?? '0.1.0') ?>
+            @astrake/lumora-webserver · v<?= e($config['brand']['version'] ?? '0.1.2') ?>
         </p>
         <h1 style="font-size:clamp(2.25rem,4vw,3.5rem);line-height:1.1;margin:0.5rem 0 1rem;">
             <?= e($config['brand']['slogan'] ?? 'Enterprise Website Micro-Kernel') ?>

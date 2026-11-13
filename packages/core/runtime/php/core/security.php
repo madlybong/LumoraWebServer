@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Astrake\Lumora\Core {
+namespace Lumora\Core {
 
 if (!defined('LUMORA_BOOTSTRAPPED')) {
     http_response_code(403);
@@ -23,10 +23,10 @@ final class Security
         self::$secretKey = null;
         self::$secretKeyRoot = '';
 
-        // 1. Backward-compatible bootstrap constants for brand partials
-        foreach (['ASTRAKE_BOOTSTRAPPED', 'AURUVI_BOOTSTRAPPED', 'DRISVA_BOOTSTRAPPED', 'ORINA_WEB_BOOTSTRAPPED'] as $legacyConst) {
-            if (!defined($legacyConst)) {
-                define($legacyConst, true);
+        // 1. Optional app-defined guard constant compatibility (opt-in via security.compat_constants)
+        foreach (($config['security']['compat_constants'] ?? []) as $constName) {
+            if (is_string($constName) && preg_match('/^[A-Z][A-Z0-9_]{2,63}$/', $constName) && !defined($constName)) {
+                define($constName, true);
             }
         }
 
@@ -67,9 +67,7 @@ final class Security
         // 4. Generate 128-bit CSPRNG CSP Nonce
         self::$cspNonce = base64_encode(random_bytes(16));
         $GLOBALS['lumoraCspNonce'] = self::$cspNonce;
-        $GLOBALS['astrakeCspNonce'] = self::$cspNonce;
         $GLOBALS['cspNonce'] = self::$cspNonce;
-        $GLOBALS['orinaCspNonce'] = self::$cspNonce;
 
         // 5. Emit Mandatory 8-Header Enterprise Security Suite
         self::emitSecurityHeaders();
@@ -85,7 +83,7 @@ final class Security
 
     public static function isLocalhost(): bool
     {
-        if (getenv('LUMORA_FORCE_PRODUCTION') === '1' || getenv('ASTRAKE_FORCE_PRODUCTION') === '1') {
+        if (getenv('LUMORA_FORCE_PRODUCTION') === '1') {
             return false;
         }
         $remoteAddr = (string)($_SERVER['REMOTE_ADDR'] ?? '');
@@ -149,7 +147,7 @@ final class Security
         }
         self::$secretKeyRoot = $resolvedRoot;
 
-        $envSecret = getenv('LUMORA_CSRF_SECRET') ?: getenv('ASTRAKE_CSRF_SECRET');
+        $envSecret = getenv('LUMORA_CSRF_SECRET');
         if (is_string($envSecret) && strlen(trim($envSecret)) >= 32) {
             return self::$secretKey = trim($envSecret);
         }
@@ -278,7 +276,14 @@ final class Security
 }
 
 namespace {
-    use Astrake\Lumora\Core\Security;
+    if (
+        class_exists(\Lumora\Core\Security::class, false)
+        && !class_exists(\Astrake\Lumora\Core\Security::class, false)
+    ) {
+        class_alias(\Lumora\Core\Security::class, \Astrake\Lumora\Core\Security::class);
+    }
+
+    use Lumora\Core\Security;
 
     if (!function_exists('lumora_csp_nonce')) {
         function lumora_csp_nonce(): string

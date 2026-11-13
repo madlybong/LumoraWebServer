@@ -44,8 +44,8 @@ return [
         '/contact/' => [
             'template' => 'contact',
             'meta'     => [
-                'title'       => 'Contact & Statutory Desk — Lumora WebStarter',
-                'description' => 'First-party encrypted inquiry, security vulnerability disclosure, and DPDP Act 2023 Data Principal portal.',
+                'title'       => 'Contact Desk — Lumora WebStarter',
+                'description' => 'First-party encrypted inquiry, security reporting, and privacy request desk.',
                 'path'        => '/contact/',
                 'schema_type' => 'contact',
             ],
@@ -53,8 +53,8 @@ return [
         '/legal/' => [
             'template' => 'legal-index',
             'meta'     => [
-                'title'       => 'Statutory Legal & Compliance Registry — Lumora WebStarter',
-                'description' => 'DPDP Act 2023, CERT-In 2022, EU GDPR, Terms of Use, Zero-Cookie Audit, and WCAG 2.2 AA disclosures.',
+                'title'       => 'Legal & Governance Policies — Lumora WebStarter',
+                'description' => 'Privacy Policy, Terms of Use, and website governance documentation.',
                 'path'        => '/legal/',
                 'schema_type' => 'legal',
             ],

@@ -1,6 +1,6 @@
 {
   "name": "@astrake/lumora-webserver",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Headless PHP 8.2+ Enterprise Website Micro-Kernel, Tailwind CSS v4 Brand Layer Compiler, Zero-Dependency cPanel/aaPanel dist/ Bundler, and 12-Gate Automated Compliance Verifier.",
   "author": "Anuvab Chakraborty (https://github.com/madlybong)",
   "license": "MIT",

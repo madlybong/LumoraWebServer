@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Astrake\Lumora\Core;
+namespace Lumora\Core;
 
 if (!defined('LUMORA_BOOTSTRAPPED')) {
     http_response_code(403);
@@ -141,4 +141,11 @@ final class Bootstrap
             'config'      => $config,
         ]));
     }
+}
+
+if (
+    class_exists(\Lumora\Core\Bootstrap::class, false)
+    && !class_exists(\Astrake\Lumora\Core\Bootstrap::class, false)
+) {
+    class_alias(\Lumora\Core\Bootstrap::class, \Astrake\Lumora\Core\Bootstrap::class);
 }

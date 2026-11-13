@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Astrake\Lumora\Core;
+namespace Lumora\Core;
 
 use Throwable;
 
@@ -74,7 +74,7 @@ final class HubClient
         $brandId = (string)($config['brand']['id'] ?? 'lumora');
 
         $payload = json_encode([
-            'schema_version' => '1.0',
+            'schema_version' => !empty($record['attribution']) ? '1.1' : '1.0',
             'brand_id'       => $brandId,
             'brand_name'     => (string)($config['brand']['name'] ?? 'Lumora'),
             'domain'         => (string)($config['brand']['domain'] ?? 'localhost'),
@@ -159,6 +159,7 @@ final class HubClient
         foreach ($rows as $row) {
             $attempted++;
             $details = json_decode((string)($row['details_json'] ?? '{}'), true);
+            $detailsArr = is_array($details) ? $details : [];
             $record = [
                 'receipt_id'        => (string)($row['receipt_id'] ?? ''),
                 'channel'           => (string)($row['channel'] ?? 'general'),
@@ -172,11 +173,14 @@ final class HubClient
                 'message'           => (string)($row['message'] ?? ''),
                 'consultation_mode' => (string)($row['consultation_mode'] ?? 'online'),
                 'facility_location' => (string)($row['facility_location'] ?? ''),
-                'details'           => is_array($details) ? $details : [],
+                'details'           => $detailsArr,
                 'ip_hash'           => (string)($row['ip_hash'] ?? ''),
                 'user_agent'        => (string)($row['user_agent'] ?? ''),
                 'created_at'        => (string)($row['created_at'] ?? ''),
             ];
+            if (!empty($detailsArr['_attribution']) && is_array($detailsArr['_attribution'])) {
+                $record['attribution'] = $detailsArr['_attribution'];
+            }
 
             $res = self::syncInquiryToHub($config, $record, $rootDir);
             if ($res['synced']) {
@@ -529,4 +533,11 @@ final class HubClient
             return 'failed';
         }
     }
+}
+
+if (
+    class_exists(\Lumora\Core\HubClient::class, false)
+    && !class_exists(\Astrake\Lumora\Core\HubClient::class, false)
+) {
+    class_alias(\Lumora\Core\HubClient::class, \Astrake\Lumora\Core\HubClient::class);
 }

@@ -1,6 +1,6 @@
-# @astrake/lumora-webserver — Full AI & Developer Specification (`v0.1.0`)
+# @astrake/lumora-webserver — Full AI & Developer Specification (`v0.1.2`)
 
-> `@astrake/lumora-webserver` is the enterprise website framework of the Lumora ecosystem. It pairs a zero-dependency headless PHP 8.2+ micro-kernel (`Astrake\Lumora\Core`) with a Bun/TypeScript CLI (`lumora-web`) that compiles Tailwind CSS v4 + brand layers, locks SHA-256 and SHA-384 Subresource Integrity (SRI) checksums in `lumora-lock.json`, verifies 12 automated security/compliance gates, and packages a standalone `dist/` bundle with physical `<route>/index.php` stubs for Apache, Nginx, cPanel, and aaPanel.
+> `@astrake/lumora-webserver` is the brand-neutral website framework of the Lumora ecosystem. It pairs a zero-dependency headless PHP 8.2+ micro-kernel (`Lumora\Core`, with legacy `Astrake\Lumora\Core` alias) with a Bun/TypeScript CLI (`lumora-web`) that compiles Tailwind CSS v4 + brand layers, locks SHA-256 and SHA-384 Subresource Integrity (SRI) checksums in `lumora-lock.json`, verifies 12 automated security/compliance gates, and packages a standalone `dist/` bundle with physical `<route>/index.php` stubs for Apache, Nginx, cPanel, and aaPanel.
 
 ---
 
@@ -9,7 +9,7 @@
 ### 1.1. `LumoraWebServer` Monorepo Layout
 ```text
 LumoraWebServer/
-├── VERSION                               # Single source of truth for package version (0.1.0)
+├── VERSION                               # Single source of truth for package version (0.1.2)
 ├── package.json                          # Bun workspace root (packages/*, apps/*)
 ├── tsconfig.base.json                    # Shared strict TypeScript configuration
 ├── AGENTS.md                             # AI Coding Agent operating rules & API quick-reference
@@ -65,7 +65,7 @@ LumoraWebServer/
 ### 1.2. Consumer Brand Website Layout
 ```text
 <brand-website>/
-├── package.json                          # devDependencies: { "@astrake/lumora-webserver": "^0.1.0" }
+├── package.json                          # devDependencies: { "@astrake/lumora-webserver": "^0.1.2" }
 ├── lumora.config.php                     # Declarative brand, security, asset, hub, legal, and feature config
 ├── lumora-lock.json                      # Auto-generated SHA-256 core lock + SHA-384 asset SRI map
 ├── index.php                             # Canonical front controller (synced from index.stub.php)
@@ -94,7 +94,7 @@ LumoraWebServer/
 │   └── vault-<32hex>/
 │       ├── lumora.sqlite                 # SQLite3 WAL database (contact_submissions, contact_rate_limits)
 │       ├── contacts-backup.jsonl         # Atomic flock JSONL failover ledger
-│       └── security-events.log           # CERT-In 180-day security event log
+│       └── security-events.log           # Security rate-limit & audit event log
 └── dist/                                 # Standalone zero-dependency production bundle (`lumora-web build`)
 ```
 
@@ -114,33 +114,35 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
 
 return [
     'brand' => [
-        'id'               => 'auruvi',                  // Lowercase identifier
-        'prefix'           => 'AUR',                     // Receipt prefix -> AUR-YYYYMMDD-XXXX
-        'name'             => 'Auruvi HMS',
-        'short_name'       => 'Auruvi',
-        'legal_entity'     => 'Astrake India',
-        'domain'           => 'auruvi.com',
-        'origin'           => 'https://auruvi.com',
-        'version'          => '2.5.0',
-        'locale'           => 'en-IN',
-        'theme_color'      => '#3e5a4e',
-        'background_color' => '#ffffff',
-        'color_scheme'     => 'light',                   // 'light' | 'dark'
-        'category'         => 'HealthApplication',
-        'operating_system' => 'Web, Linux, Windows, macOS',
-        'slogan'           => 'Hybrid On-Premise Hospital & Clinic Management Software',
-        'description'      => 'Enterprise HMS with LAN-first resilience.',
-        'contact_email'    => 'office@auruvi.com',
-        'security_email'   => 'security@auruvi.com',
-        'logo'             => '/public/brand/icon.svg',
-        'og_image'         => '/public/brand/og-default.png',
-        'address'          => [
-            'street'      => 'Shop No 3, Ground Floor, 13B Bireswar Dhole Lane',
-            'locality'    => 'Kolkata',
-            'region'      => 'West Bengal',
-            'postal_code' => '700035',
-            'country'     => 'IN',
-        ],
+        'id'                            => 'acme',             // Lowercase identifier
+        'prefix'                        => 'ACM',              // Receipt prefix -> ACM-YYYYMMDD-XXXX
+        'name'                          => 'Acme Studio',
+        'short_name'                    => 'Acme',
+        'legal_entity'                  => 'Acme Studio LLC',  // Optional legal operator name
+        'expose_legal_entity_in_schema' => false,              // Emit legalName on Organization JSON-LD
+        'expose_legal_entity_in_llms'   => false,              // Include legal_entity in /llms.txt
+        'schema_org_type'               => 'Organization',     // 'Organization' | 'Person' | 'LocalBusiness'
+        'framework_label'               => 'lumora-webserver', // Label returned in /health
+        'domain'                        => 'acme.example.com',
+        'origin'                        => 'https://acme.example.com',
+        'version'                       => '0.1.2',
+        'locale'                        => 'en',
+        'theme_color'                   => '#0a0a0a',
+        'background_color'              => '#ffffff',
+        'color_scheme'                  => 'light',            // 'light' | 'dark'
+        'primary_offering_schema'       => false,              // Emit SoftwareApplication JSON-LD node
+        'emit_brand_node'               => false,              // Emit standalone Brand JSON-LD node
+        'category'                      => 'BusinessApplication',
+        'operating_system'              => 'Web, Linux, Windows, macOS',
+        'slogan'                        => 'Fast, resilient static-first websites.',
+        'description'                   => 'Example site configuration for @astrake/lumora-webserver.',
+        'contact_email'                 => 'contact@acme.example.com',
+        'security_email'                => 'security@acme.example.com',
+        'logo'                          => '/public/brand/icon.svg',
+        'og_image'                      => '/public/brand/og-default.png',
+        'same_as'                       => [],
+        'contact_points'                => [],
+        'address'                       => [],                 // Optional: street, locality, region, postal_code, country
     ],
     'security' => [
         'canonical_https_redirect' => true,
@@ -151,12 +153,13 @@ return [
         'rate_limit_max_attempts'  => 5,
         'rate_limit_window_sec'    => 900,
         'csrf_ttl_sec'             => 7200,
+        'compat_constants'         => [], // Opt-in legacy constant names (/^[A-Z][A-Z0-9_]{2,63}$/)
     ],
     'assets' => [
         'compiled_css' => '/public/assets/css/lumora.min.css',
         'core_js'      => '/public/assets/js/lumora-core.js',
         'fonts'        => [
-            '/public/fonts/manrope-latin.woff2',
+            '/public/fonts/inter-latin.woff2',
         ],
         'vendor_js'    => [],
     ],
@@ -168,19 +171,31 @@ return [
         'fallback_notify' => true,
     ],
     'legal' => [
-        'territories'         => ['IN', 'EU', 'GLOBAL'], // 'IN' | 'EU' | 'UK' | 'US' | 'GLOBAL'
-        'entity_type'         => 'Proprietorship',
-        'grievance_officer'   => 'Grievance & Data Protection Officer',
-        'grievance_email'     => 'privacy@auruvi.com',
+        'territories'         => ['GLOBAL'],          // 'IN' | 'EU' | 'UK' | 'US' | 'GLOBAL'
+        'slugs'               => ['privacy', 'terms'], // Or auto-discovered + custom content/legal/*.php
+        'include_default_slugs' => true,
+        'entity_type'         => '',
+        'grievance_officer'   => '',
+        'grievance_email'     => 'contact@acme.example.com',
         'effective_date'      => '2026-11-10',
-        'retention_days_pii'  => 90,
-        'retention_days_logs' => 180,
-        'governing_law'       => 'Kolkata, West Bengal, India',
+        'retention_days_pii'  => 90,   // Set 0 or null to disable automated PII redaction
+        'retention_days_logs' => 180,  // Set 0 or null to disable automated log purge
+        'governing_law'       => '',
+    ],
+    'discovery' => [
+        'robots_txt'    => true,
+        'sitemap_xml'   => true,
+        'llms_txt'      => true,
+        'llms_full_txt' => true,
+        'security_txt'  => true, // Defaults auto from security_email / .well-known/security.txt if omitted
+        'webmanifest'   => true,
     ],
     'features' => [
         'docs_engine'    => true,
         'blog_engine'    => true,
         'release_server' => false,
+        'legal_registry' => true,
+        'inquiry_engine' => true,
     ],
 ];
 ```
@@ -243,24 +258,16 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
 return [
     'default_channel' => 'general',
     'honeypot_mode'   => 'reject', // 'reject' | 'fake_receipt'
-    'aliases'         => [
-        'data-rights' => 'privacy',
-        'dpdp'        => 'privacy',
-        'gdpr'        => 'privacy',
-    ],
-    'referer_map'     => [
-        '/docs'           => 'architecture',
-        '/legal/security' => 'security',
-        '/legal/privacy'  => 'privacy',
-    ],
+    'aliases'         => [],
+    'referer_map'     => [],
     'channels'        => [
         'general' => [
             'code'                => 'CHN-01',
-            'label'               => 'Business & Project Inquiry',
-            'heading'             => 'Send an Enterprise Inquiry',
-            'sla'                 => '1 Business Day',
-            'subject_placeholder' => 'e.g. Deployment Scoping',
-            'message_label'       => 'Requirements *',
+            'label'               => 'General Inquiry',
+            'heading'             => 'Send an Inquiry',
+            'sla'                 => '1-2 Business Days',
+            'subject_placeholder' => 'e.g. Project Scoping',
+            'message_label'       => 'Message *',
             'message_placeholder' => 'Describe your requirements...',
             'button_text'         => 'Send Inquiry',
             'auto_subject'        => false, // Set true if form omits explicit subject input
@@ -284,24 +291,24 @@ return [
             'code'        => 'CHN-02',
             'label'       => 'Security Vulnerability Report',
             'heading'     => 'Report a Security Issue',
-            'sla'         => '24 Hours (CERT-In Mandate)',
+            'sla'         => '24 Hours',
             'button_text' => 'Submit Security Report',
             'fields'      => [],
         ],
         'privacy' => [
             'code'        => 'CHN-03',
-            'label'       => 'Data Privacy & DPDP Rights',
-            'heading'     => 'Data Principal Rights & Statutory Inquiries',
-            'sla'         => '72 Hours (DPDP Sec 13)',
-            'button_text' => 'Submit Data Rights Request',
+            'label'       => 'Privacy & Data Rights',
+            'heading'     => 'Privacy & Data Deletion Requests',
+            'sla'         => '72 Hours',
+            'button_text' => 'Submit Privacy Request',
             'fields'      => [],
         ],
     ],
 ];
 ```
 
-### 2.4. `content/legal/{slug}.php` (Territory Merge & Override Contract)
-Valid slugs: `privacy`, `terms`, `cookies`, `accessibility`, `security`, `company`.
+### 2.4. `content/legal/{slug}.php` (Custom Document & Territory Merge Contract)
+Built-in baseline slugs: `privacy`, `terms`, `cookies`, `accessibility`, `security`, `company` (defaults to `['privacy', 'terms']` with optional arbitrary custom slugs).
 ```php
 <?php
 declare(strict_types=1);
@@ -312,17 +319,17 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
 }
 
 return [
-    'merge_territory'  => true, // When true, merges onto generated territory baseline
-    'title'            => 'Privacy Notice & Data Protection Policy',
+    'merge_territory'  => true, // When true on built-in slugs, merges onto territory baseline
+    'title'            => 'Privacy Policy',
     'prepend_sections' => [],
     'replace_sections' => [
         // Override specific baseline section by ID ('architecture', 'fiduciary', 'processing', 'retention', 'rights')
     ],
     'append_sections'  => [
         [
-            'id'    => 'clinical-lan',
-            'title' => '6. On-Premise LAN Data Sovereignty',
-            'body'  => '<p>Clinical records remain strictly within the hospital local area network.</p>',
+            'id'    => 'local-vault',
+            'title' => '6. Local Storage Guarantee',
+            'body'  => '<p>Submissions are written locally to an isolated SQLite WAL database.</p>',
         ],
     ],
 ];
@@ -330,13 +337,13 @@ return [
 
 ---
 
-## 3. Headless PHP Core Reference (`Astrake\Lumora\Core`)
+## 3. Headless PHP Core Reference (`Lumora\Core`, with `Astrake\Lumora\Core` alias)
 
 1. **`Bootstrap`**:
    - `Bootstrap::init(string $rootDir): array`: Loads `lumora.config.php`, sets `$GLOBALS['lumoraConfig']` and `$GLOBALS['lumoraRootDir']`, boots `Security` and `Render`.
    - `Bootstrap::handleRequest(string $rootDir): void`: Executes the complete HTTP request lifecycle.
 2. **`Security`**:
-   - `Security::boot(array $config, string $rootDir): void`: Defines legacy bootstrap constants (`ASTRAKE_BOOTSTRAPPED`, `AURUVI_BOOTSTRAPPED`, `DRISVA_BOOTSTRAPPED`, `ORINA_WEB_BOOTSTRAPPED`), suppresses `display_errors` outside localhost, enforces canonical HTTPS/non-www `301` redirect, generates 128-bit CSP nonce, and emits 8 security headers.
+   - `Security::boot(array $config, string $rootDir): void`: Defines any opt-in `security.compat_constants` matching `/^[A-Z][A-Z0-9_]{2,63}$/`, suppresses `display_errors` outside localhost, enforces canonical HTTPS/non-www `301` redirect, generates 128-bit CSP nonce, and emits 8 security headers.
    - `Security::cspNonce(): string` / `lumora_csp_nonce(): string`
    - `Security::csrfToken(?string $rootDir = null, int $now = 0): string` / `lumora_csrf_token(): string`
    - `Security::verifyCsrf(?string $rootDir, ?string $token, int $now = 0): bool` / `lumora_verify_csrf(?string $token): bool`
@@ -348,6 +355,7 @@ return [
    - `Router::resolve(string $rawPath, array $config, string $rootDir): array`
 4. **`Discovery`**:
    - `Discovery::tryServe(string $path, array $config, string $rootDir, string $basePath = ''): bool`
+   - `Discovery::isEndpointEnabled(string $key, array $config, string $rootDir): bool`
 5. **`Render`**:
    - `Render::escape(?string $value): string` / `e(?string $value): string`
    - `Render::assetUrl(string $assetPath, ?string $rootDir = null): string` / `asset_url(string $path): string`
@@ -376,6 +384,7 @@ return [
          'email'           => string,
          'return_contact'  => string,
          'details'         => array<string, string>,
+         'attribution'     => array<string, string>, // First-party UTM & CTA fields when present
          'email_status'    => 'sent'|'skipped'|'failed'|'pending',
          'whatsapp_status' => 'sent'|'skipped'|'failed'|'pending',
          'sync_status'     => 'synced'|'skipped'|'pending'|'failed',
@@ -394,8 +403,8 @@ return [
 ### 4.1. Package Entrypoints
 - `@astrake/lumora-webserver`: Re-exports `./types` and `./cli`.
 - `@astrake/lumora-webserver/types`:
-  - `LumoraWebConfigSchema`, `LumoraBrandConfigSchema`, `LumoraSecurityConfigSchema`, `LumoraAssetsConfigSchema`, `LumoraHubSyncConfigSchema`, `LumoraLegalConfigSchema`, `LumoraFeaturesConfigSchema`, `type LumoraWebConfig`, `type LumoraLockfile`.
-  - `LumoraInquiryRecordSchema`, `LumoraInquiryWirePayloadSchema`, `type LumoraInquiryRecord`, `type LumoraInquiryWirePayload`.
+  - `LumoraWebConfigSchema`, `LumoraBrandConfigSchema`, `LumoraSecurityConfigSchema`, `LumoraAssetsConfigSchema`, `LumoraDiscoveryConfigSchema`, `LumoraHubSyncConfigSchema`, `LumoraLegalConfigSchema`, `LumoraFeaturesConfigSchema`, `type LumoraWebConfig`, `type LumoraLockfile`.
+  - `LumoraInquiryRecordSchema`, `LumoraInquiryWirePayloadSchema`, `LumoraAttributionSchema`, `type LumoraInquiryRecord`, `type LumoraInquiryWirePayload`.
   - `signLumoraWebhookPayload(rawBody: string, timestamp: string | number, secret: string): string`
   - `verifyLumoraWebhookSignature(rawBody: string, timestamp: string, signatureHeader: string, secret: string, maxAgeSeconds?: number): boolean`
 - `@astrake/lumora-webserver/cli`:
@@ -419,11 +428,11 @@ When `hub.enabled` is `true`, `HubClient::syncInquiryToHub()` sends `POST <hub.e
 2. **Gate 02 — PHP 8.2+ Syntax & Strict Types:** Validates syntax via `TOKEN_PARSE` + `php -l` and asserts `declare(strict_types=1);` in every `.php` file.
 3. **Gate 03 — `LUMORA_BOOTSTRAPPED` Direct-Access Isolation:** Asserts every `.php` file outside `index.php` and `router.php` checks `!defined('LUMORA_BOOTSTRAPPED')` and exits `403`.
 4. **Gate 04 — Font & Vendor Asset SRI SHA-384 Synchronization:** Asserts `lumora.min.css`, `lumora-core.js`, and all `.woff2` fonts in `public/fonts/` match their `sha384-...` hashes in `lumora-lock.json`.
-5. **Gate 05 — Zero Third-Party Leaks (GDPR & DPDP Act 2023):** Scans all `.php`, `.css`, and `.js` files for external font/script CDNs, analytics trackers, `eval()`, and `new Function()`.
+5. **Gate 05 — Zero Third-Party Leaks (First-Party Security):** Scans all `.php`, `.css`, and `.js` files for external font/script CDNs, analytics trackers, `eval()`, and `new Function()`.
 6. **Gate 06 — Design Token & Accessibility Audit:** Verifies `lumora.min.css` is non-empty and includes `prefers-reduced-motion` and `:focus-visible`, and every `<img>` in `templates/` has `width`, `height`, and `alt`.
 7. **Gate 07 — Canonical Route & Trailing-Slash Audit:** Validates all routes in `content/routes.php` use trailing slashes and resolve to existing `templates/*.php` files.
-8. **Gate 08 — Statutory Legal & DPDP Portal Completeness:** Boots `Bootstrap::init()` and verifies `/legal/{privacy,terms,cookies,accessibility,security,company}/` and `/contact/?topic=privacy`.
+8. **Gate 08 — Legal & Inquiry Route Completeness:** Boots `Bootstrap::init()` and verifies active `LegalRegistry::activeSlugs()` documents (or clean skip when `features.legal_registry = false`) and `/contact/` when `features.inquiry_engine` is enabled.
 9. **Gate 09 — Edge SQLite WAL & Pre-CSRF Rate-Limit Smoke Test:** Executes an isolated CLI smoke test against `InquiryEngine::handle()` testing honeypot, `<2s` timing trap, invalid CSRF, valid submission (SQLite WAL + JSONL + HMAC signature), and 6th-attempt pre-CSRF rate limit (`5 / 900s`).
-10. **Gate 10 — Ephemeral Live HTTP Security Header Audit:** Boots `php -S 127.0.0.1:<port> router.php` and verifies all 8 HTTP security headers on `GET /`, `403` on `/core/security.php`, `/lumora.config.php`, and `/storage/`, and `200 OK` on `/health`, `/robots.txt`, `/sitemap.xml`, `/llms.txt`, `/llms-full.txt`, `/.well-known/security.txt`, and `/site.webmanifest`.
+10. **Gate 10 — Ephemeral Live HTTP Security Header Audit:** Boots `php -S 127.0.0.1:<port> router.php` and verifies all 8 HTTP security headers on `GET /`, `403` on `/core/security.php`, `/lumora.config.php`, and `/storage/`, and `200 OK` on `/health` plus all enabled discovery endpoints.
 11. **Gate 11 — Zero-Dependency `dist/` Packaging Verification:** Asserts `dist/` contains zero `.md`, `.lock`, `.sh`, `.ts`, `node_modules`, or root `router.php` files, and contains physical `<route>/index.php` stubs.
-12. **Gate 12 — Ephemeral `dist/` Production Server Smoke Test:** Boots `php -S 127.0.0.1:<port> -t dist` (without `router.php`) and verifies `200 OK` + CSP header + zero fatal errors across all canonical routes and `/legal/privacy/`, plus `301` across all configured redirects.
+12. **Gate 12 — Ephemeral `dist/` Production Server Smoke Test:** Boots `php -S 127.0.0.1:<port> -t dist` (without `router.php`) and verifies `200 OK` + CSP header + zero fatal errors across all canonical routes (and first active `/legal/{slug}/` route when enabled), plus `301` across all configured redirects.

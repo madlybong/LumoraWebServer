@@ -1,6 +1,17 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 
+export const LumoraAttributionSchema = z.object({
+  utm_source: z.string().max(120).optional(),
+  utm_medium: z.string().max(120).optional(),
+  utm_campaign: z.string().max(120).optional(),
+  utm_term: z.string().max(120).optional(),
+  utm_content: z.string().max(120).optional(),
+  landing_page: z.string().max(120).optional(),
+  referrer: z.string().max(120).optional(),
+  cta_id: z.string().max(120).optional(),
+});
+
 export const LumoraInquiryRecordSchema = z.object({
   receipt_id: z.string().regex(/^[A-Z0-9]{2,8}-\d{8}-[A-F0-9]{4,8}$/),
   brand_id: z.string().min(2).max(64).optional(),
@@ -15,20 +26,25 @@ export const LumoraInquiryRecordSchema = z.object({
   message: z.string().min(5).max(4000),
   consultation_mode: z.enum(["online", "onsite"]).optional().default("online"),
   facility_location: z.string().max(200).optional().default(""),
-  details: z.record(z.string(), z.string()).optional().default({}),
+  details: z
+    .record(z.string(), z.union([z.string(), z.record(z.string(), z.string())]))
+    .optional()
+    .default({}),
+  attribution: LumoraAttributionSchema.optional(),
   ip_hash: z.string().min(16).max(64),
   user_agent: z.string().max(300).optional().default(""),
   created_at: z.string(),
 });
 
 export const LumoraInquiryWirePayloadSchema = z.object({
-  schema_version: z.literal("1.0"),
+  schema_version: z.union([z.literal("1.0"), z.literal("1.1")]).default("1.0"),
   brand_id: z.string().min(2).max(64),
   brand_name: z.string().min(2).max(120),
   domain: z.string().min(3).max(120),
   inquiry: LumoraInquiryRecordSchema,
 });
 
+export type LumoraAttribution = z.infer<typeof LumoraAttributionSchema>;
 export type LumoraInquiryRecord = z.infer<typeof LumoraInquiryRecordSchema>;
 export type LumoraInquiryWirePayload = z.infer<typeof LumoraInquiryWirePayloadSchema>;
 

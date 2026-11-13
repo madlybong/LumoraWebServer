@@ -2,13 +2,13 @@
 
 This is the authoritative operating guide for AI coding agents working in:
 1. **The `LumoraWebServer` framework monorepo** (`packages/core`, `apps/starter`, `tools/`), OR
-2. **Any consumer brand website** powered by `@astrake/lumora-webserver` (e.g., Astrake, Auruvi, Arenea, Drisva, Orina).
+2. **Any consumer website** powered by `@astrake/lumora-webserver` (personal portfolios, commercial sites, SaaS products, or regulated enterprise portals).
 
 ---
 
 ## 1. Mission & Core Architectural Invariants
 
-`@astrake/lumora-webserver` is a headless PHP 8.2+ enterprise website micro-kernel, Tailwind CSS v4 brand layer compiler, zero-dependency `dist/` bundler, and 12-Gate automated compliance verifier.
+`@astrake/lumora-webserver` is a headless PHP 8.2+ website micro-kernel, Tailwind CSS v4 brand layer compiler, zero-dependency `dist/` bundler, and 12-Gate automated verification suite.
 
 ### Non-Negotiable Rules
 
@@ -26,7 +26,7 @@ This is the authoritative operating guide for AI coding agents working in:
          exit('Forbidden');
      }
      ```
-   - When a core PHP file declares both `Astrake\Lumora\Core` classes and global helper functions, use bracketed namespaces (`namespace Astrake\Lumora\Core { ... }` followed by `namespace { ... }`).
+   - When a core PHP file declares both `Lumora\Core` classes and global helper functions, use bracketed namespaces (`namespace Lumora\Core { ... }` followed by `namespace { ... }`) and register backward-compatible `class_alias(\Lumora\Core\<Class>::class, \Astrake\Lumora\Core\<Class>::class)` declarations.
 4. **Zero Third-Party Leaks (`Gate 05`):**
    - Never reference external font CDNs (`fonts.googleapis.com`, `fonts.gstatic.com`), script CDNs (`cdnjs`, `unpkg`, `jsdelivr`), or third-party trackers (`googletagmanager`, `google-analytics`, `hotjar`, `facebook`) in any template, CSS, or JS file.
    - Never use `eval(` or `new Function(` in any JS or PHP file.
@@ -53,7 +53,7 @@ When authoring brand templates in `templates/**/*.php`, use these global helper 
 | `asset_sri(string $path): string` | Returns the `sha384-...` Subresource Integrity hash for `$path` from `lumora-lock.json` (or `''` if not locked). |
 | `component(string $name, array $props = []): void` | Includes `templates/components/{$name}.php` or `templates/layout/{$name}.php` with `$props` extracted (`EXTR_SKIP`). |
 | `render_template(string $name, array $ctx = []): void` | Renders `templates/{$name}.php` (falling back to `templates/404.php` with HTTP 404 if missing). |
-| `lumora_head_meta(array $meta = []): string` | Emits `<title>`, SEO `<meta>`, canonical & `hreflang` links, `/llms.txt` & `/llms-full.txt` alternate links, `/site.webmanifest`, OpenGraph & Twitter tags, WOFF2 font `<link rel="preload">` tags with `integrity`, compiled stylesheet `<link rel="stylesheet">` with `integrity`, and CSP-nonced `<script type="application/ld+json">` Schema.org `@graph`. |
+| `lumora_head_meta(array $meta = []): string` | Emits `<title>`, SEO `<meta>`, canonical & `hreflang` links, conditional `/llms.txt`, `/llms-full.txt`, and `/site.webmanifest` links (controlled by `discovery.*`), OpenGraph & Twitter tags, WOFF2 font `<link rel="preload">` tags with `integrity`, compiled stylesheet `<link rel="stylesheet">` with `integrity`, and CSP-nonced `<script type="application/ld+json">` Schema.org `@graph`. |
 | `lumora_core_script(): string` | Emits `<script type="module" src=".../lumora-core.js?v=..." nonce="..." integrity="sha384-..." crossorigin="anonymous"></script>`. |
 | `lumora_csp_nonce(): string` | Returns the per-request 128-bit base64 CSP nonce (`$GLOBALS['lumoraCspNonce']`). Required on any custom `<script nonce="<?= e(lumora_csp_nonce()) ?>">`. |
 | `lumora_csrf_token(): string` | Generates a CGNAT-resilient stateless v2 HMAC-SHA256 CSRF token (`{tsHex}.{nonceHex}.{mac}`). |
@@ -72,7 +72,7 @@ When authoring brand templates in `templates/**/*.php`, use these global helper 
 - `$meta` (`array`): Route SEO/Schema metadata (`title`, `description`, `path`, `schema_type`, optional `faq`, `image`, `robots`). Pass to `component('layout/head', ['meta' => $meta, 'config' => $config])`.
 - `$currentPath` (`string`): Normalized canonical path (e.g., `'/'`, `'/contact/'`, `'/legal/privacy/'`).
 - **Route-Specific Params:**
-  - On `/legal/{slug}/` (`templates/legal.php`): `$slug` (`string`) and `$legal_data` (`array` with `doc_no`, `title`, `lead`, `version`, `date`, `status`, `entity_name`, `entity_type`, `address`, `email`, `territories`, `sections`).
+  - On `/legal/{slug}/` (`templates/legal.php`, when `features.legal_registry` is enabled and `$slug` is active via `LegalRegistry::activeSlugs()`): `$slug` (`string`) and `$legal_data` (`array` with `doc_no`, `title`, `lead`, `version`, `date`, `status`, `entity_name`, `entity_type`, `address`, `email`, `territories`, `sections`).
   - On `/docs/{slug}/` or `/docs/{track}/{slug}/` (`templates/docs.php` or `templates/docs-article.php`): `$doc_article` (`array` with `found`, `track_id`, `slug`, `title`, `summary`, `reading_time`, `tags`, `html`, `toc`) and `$doc_manifest` (`array`).
   - On `/blog/{slug}/` (`templates/blog-article.php`): `$slug` (`string`) and `$post_data` (`array`).
   - On `/blog/page/{n}/` (`templates/blog-index.php`): `$page_num` (`int`).
@@ -92,6 +92,8 @@ When authoring brand templates in `templates/**/*.php`, use these global helper 
   - `[data-lumora-onsite-fields]`: Container revealed (`hidden = false`) when delivery mode is `'onsite'`, setting `required = true` on `[name="facility_location"]` and `[name="phone"]`.
   - `[data-lumora-phone-required]`: Badge revealed when phone is required for on-site assessments.
   - `[data-lumora-char-counter]`: Live character counter bound to `textarea[name="message"]` (`minlength` / `maxlength`).
+- **First-Party Attribution (`initFirstPartyAttribution()`):**
+  - `[data-lumora-cta="<id>"]`: Records the clicked CTA identifier into `window.sessionStorage` (`lumora_attr_v1`) alongside landing page, referrer, and UTM query parameters, and injects hidden `_attr_*` fields into `form[data-lumora-contact-form]`.
 
 ---
 

@@ -39,11 +39,11 @@ The generated `dist/` directory contains:
    ```nginx
    server {
        listen 443 ssl http2;
-       server_name auruvi.com;
-       root /var/www/auruvi/dist;
+       server_name acme.example.com;
+       root /var/www/acme/dist;
        index index.php;
 
-       include /var/www/auruvi/dist/nginx.lumora.conf;
+       include /var/www/acme/dist/nginx.lumora.conf;
 
        location ~ \.php$ {
            include fastcgi_params;
@@ -76,20 +76,20 @@ return [
     'email' => [
         'enabled'    => true,
         'transport'  => 'smtp',
-        'to'         => 'desk@auruvi.com',
-        'from_email' => 'noreply@auruvi.com',
-        'smtp_host'  => 'smtp.auruvi.com',
+        'to'         => 'desk@acme.example.com',
+        'from_email' => 'noreply@acme.example.com',
+        'smtp_host'  => 'smtp.acme.example.com',
         'smtp_port'  => 587,
-        'smtp_user'  => 'noreply@auruvi.com',
+        'smtp_user'  => 'noreply@acme.example.com',
         'smtp_pass'  => 'your-smtp-password',
         'smtp_tls'   => true,
     ],
     'whatsapp' => [
         'enabled'     => true,
         'provider'    => 'waha', // 'waha' | 'evolution' | 'webhook'
-        'phone'       => '919830000000',
+        'phone'       => '15550100199',
         'api_key'     => 'your-waha-api-key',
-        'webhook_url' => 'https://wa.internal.astrake.com',
+        'webhook_url' => 'https://wa.internal.example.com',
         'instance'    => 'default',
     ],
 ];
@@ -111,6 +111,6 @@ return 'your-32-byte-minimum-hmac-sha256-shared-secret';
 ### 3.3. Replaying Pending Outbox Inquiries
 If the Central Hub was temporarily unreachable during a visitor submission, the inquiry remains safely stored in `storage/vault-<hmac>/lumora.sqlite` with `sync_status = 'pending'`. Replay pending rows either via CLI cron:
 ```bash
-bunx lumora-web flush --cwd /var/www/auruvi/dist
+bunx lumora-web flush --cwd /var/www/acme/dist
 ```
 or remotely from your Central Hub by sending an HMAC-signed `POST /_lumora/outbox/flush` request with headers `X-Lumora-Timestamp` and `X-Lumora-Signature`.

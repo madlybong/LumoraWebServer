@@ -9,23 +9,31 @@
 ### 1.1. `brand` Section
 | Key | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `id` | `string` | `'lumora'` | Lowercase machine identifier (e.g., `'astrake'`, `'auruvi'`, `'drisva'`). Bound into v2 CSRF HMACs and Hub webhooks. |
+| `id` | `string` | `'lumora'` | Lowercase machine identifier (e.g., `'acme'`, `'studio'`). Bound into v2 CSRF HMACs and Hub webhooks. |
 | `prefix` | `string` | `'LUM'` | Uppercase prefix for inquiry receipts (`{PREFIX}-YYYYMMDD-{4HEX}`). |
-| `name` | `string` | `'Lumora'` | Display name of the brand or product. |
+| `name` | `string` | `'Lumora'` | Display name of the brand, person, or product. |
 | `short_name` | `string` | `brand.name` | Short name emitted in `/site.webmanifest`. |
-| `legal_entity` | `string` | `brand.name` | Registered legal entity operating the website (e.g., `'Astrake India'`). |
+| `legal_entity` | `string` | `''` (optional) | Registered legal entity operating the website (e.g., `'Acme Studio LLC'`). |
+| `expose_legal_entity_in_schema` | `bool` | `false` | Emits `legalName` on Schema.org `Organization` only when `true`. |
+| `expose_legal_entity_in_llms` | `bool` | `false` | Mentions `legal_entity` in `/llms.txt` only when `true`. |
+| `schema_org_type` | `'Organization'\|'Person'\|string` | `'Organization'` | Primary entity `@type` in Schema.org JSON-LD (`Organization`, `Person`, `LocalBusiness`, etc.). |
+| `framework_label` | `string` | `'lumora-webserver'` | Framework label emitted in `/health`. |
 | `domain` | `string` | `'localhost'` | Bare canonical domain (used for non-www redirects and SMTP `EHLO`). |
-| `origin` | `string` | `'https://localhost'` | Full canonical origin URL without trailing slash (e.g., `'https://auruvi.com'`). |
-| `version` | `string` | `'0.1.0'` | Product/website version string emitted in `/health` and legal headers. |
-| `locale` | `string` | `'en-IN'` | BCP-47 locale tag emitted in `<html lang>`, `hreflang`, and Schema.org `WebSite`. |
+| `origin` | `string` | `'https://localhost'` | Full canonical origin URL without trailing slash (e.g., `'https://acme.example.com'`). |
+| `version` | `string` | `'0.1.2'` | Product/website version string emitted in `/health` and legal headers. |
+| `locale` | `string` | `'en'` | BCP-47 locale tag emitted in `<html lang>`, `hreflang`, and Schema.org `WebSite`. |
 | `theme_color` | `string` | `'#0a0a0a'` | Browser theme color meta and webmanifest token. |
 | `color_scheme` | `'light'\|'dark'` | `'light'` | `<meta name="color-scheme">` value. |
-| `category` | `string` | `'BusinessApplication'` | Schema.org `SoftwareApplication.applicationCategory`. |
-| `slogan` | `string` | `''` | Tagline used in Schema.org `Brand` and default page titles. |
+| `primary_offering_schema` | `bool` | `false` | When `true` and `schema_org_type !== 'Person'`, emits a `SoftwareApplication` node in Schema.org `@graph`. |
+| `emit_brand_node` | `bool` | `false` | Emits a separate Schema.org `Brand` node when `true`. |
+| `category` | `string` | `'BusinessApplication'` | Schema.org `SoftwareApplication.applicationCategory` when `primary_offering_schema` is `true`. |
+| `slogan` | `string` | `''` | Tagline used in default page titles and Schema.org descriptions. |
 | `description` | `string` | `brand.slogan` | Default meta description and `/llms.txt` summary. |
-| `contact_email` | `string` | `'office@' . domain` | Primary public contact and fallback notification address. |
-| `security_email` | `string` | `contact_email` | Contact email emitted in `/.well-known/security.txt`. |
-| `address` | `array` | `[]` | Associative array with `street`, `locality`, `region`, `postal_code`, `country`. |
+| `contact_email` | `string` | `'contact@' . domain` | Primary public contact and fallback notification address. |
+| `security_email` | `string` | `''` | Contact email emitted in `/.well-known/security.txt` (enables `/security.txt` by default when set). |
+| `same_as` | `string[]` | `[]` | Profile / organization URLs emitted in Schema.org `sameAs`. |
+| `contact_points` | `array[]` | `[]` | Custom Schema.org `ContactPoint` objects overriding the default contact point. |
+| `address` | `array` | `[]` | Optional `street`, `locality`, `region`, `postal_code`, `country` (empty fields omitted). |
 
 ### 1.2. `security` Section
 | Key | Type | Default | Description |
@@ -38,20 +46,34 @@
 | `rate_limit_max_attempts` | `int` | `5` | Maximum POST attempts per `ip_hash` within `rate_limit_window_sec` before pre-CSRF rejection. |
 | `rate_limit_window_sec` | `int` | `900` | Rolling rate-limit window in seconds (default 15 minutes). |
 | `csrf_ttl_sec` | `int` | `7200` | Stateless v2 CSRF token validity window in seconds (default 2 hours). |
+| `compat_constants` | `string[]` | `[]` | Opt-in list of legacy constant names matching `/^[A-Z][A-Z0-9_]{2,63}$/` defined to `true` during `Security::boot()`. |
 
-### 1.3. `assets` Section
+### 1.3. `assets`, `discovery`, `legal`, & `features` Sections
 | Key | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `compiled_css` | `string` | `'/public/assets/css/lumora.min.css'` | Compiled stylesheet path injected by `lumora_head_meta()`. |
-| `core_js` | `string` | `'/public/assets/js/lumora-core.js'` | Core client ES module injected by `lumora_core_script()`. |
-| `fonts` | `string[]` | `[]` | Array of `/public/fonts/*.woff2` paths to preload with SHA-384 `integrity`. |
-| `vendor_js` | `string[]` | `[]` | Optional vendored JS files to include in `lumora-lock.json` SRI calculation. |
+| `assets.compiled_css` | `string` | `'/public/assets/css/lumora.min.css'` | Compiled stylesheet path injected by `lumora_head_meta()`. |
+| `assets.core_js` | `string` | `'/public/assets/js/lumora-core.js'` | Core client ES module injected by `lumora_core_script()`. |
+| `assets.fonts` | `string[]` | `[]` | Array of `/public/fonts/*.woff2` paths to preload with SHA-384 `integrity`. |
+| `assets.vendor_js` | `string[]` | `[]` | Optional vendored JS files to include in `lumora-lock.json` SRI calculation. |
+| `discovery.robots_txt` | `bool` | `true` | Enables `/robots.txt`. |
+| `discovery.sitemap_xml` | `bool` | `true` | Enables `/sitemap.xml`. |
+| `discovery.llms_txt` | `bool` | `true` | Enables `/llms.txt` and `<link rel="alternate">` in `lumora_head_meta()`. |
+| `discovery.llms_full_txt` | `bool` | `true` | Enables `/llms-full.txt` and `<link rel="alternate">` in `lumora_head_meta()`. |
+| `discovery.security_txt` | `bool` | auto | Defaults `true` only if `brand.security_email` is set or `.well-known/security.txt` exists; set explicit `bool` to override. |
+| `discovery.webmanifest` | `bool` | `true` | Enables `/site.webmanifest` and `<link rel="manifest">`. |
+| `legal.territories` | `string[]` | `['GLOBAL']` | Opt-in statutory clause profiles (`'IN'`, `'EU'`, `'UK'`, `'US'`, `'GLOBAL'`). |
+| `legal.slugs` | `string[]` | auto (`['privacy', 'terms']` + `content/legal/*.php`) | Explicit list of active `/legal/{slug}/` routes. |
+| `legal.include_default_slugs` | `bool` | `true` | Includes `'privacy'` and `'terms'` when `legal.slugs` is omitted. |
+| `legal.retention_days_pii` | `int\|null` | `90` | Days before `InquiryDb::prune()` redacts PII (`0` or `null` disables redaction). |
+| `legal.retention_days_logs` | `int\|null` | `180` | Days before `InquiryDb::prune()` deletes old rate-limit/log entries (`0` disables purge). |
+| `features.legal_registry` | `bool` | `true` | Disables all `/legal/*` routes when `false`. |
+| `features.inquiry_engine` | `bool` | `true` | Controls inquiry engine checks during `lumora-web verify`. |
 
 ### 1.4. `hub` & `notifications` Sections
 | Key | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `hub.enabled` | `bool` | `false` | Enables HMAC-SHA256 server-to-server webhook dispatch on form submission. |
-| `hub.endpoint` | `string` | `''` | Target ingest URL (e.g., `'https://dispatch.astrake.com/api/v1/lumora/inquiries/ingest'`). |
+| `hub.endpoint` | `string` | `''` | Target ingest URL (e.g., `'https://hub.example.com/api/v1/lumora/inquiries/ingest'`). |
 | `hub.shared_secret` | `string` | `''` | HMAC signing secret (can also be supplied via `LUMORA_HUB_SECRET` or `storage/hub-secret.php`). |
 | `hub.timeout_ms` | `int` | `1500` | HTTP timeout in milliseconds (`500`–`3000`). |
 | `hub.fallback_notify` | `bool` | `true` | Runs standalone Edge SMTP/WhatsApp notifications if the Hub is disabled or unreachable. |
@@ -78,11 +100,11 @@
 
 ---
 
-## 3. Statutory Territory Legal Overrides (`content/legal/{slug}.php`)
+## 3. Custom Legal Documents & Territory Clauses (`content/legal/{slug}.php`)
 
-`LegalRegistry` generates baseline statutory documents for `/legal/{privacy,terms,cookies,accessibility,security,company}/` parameterized by `legal.territories` (`'IN'`, `'EU'`, `'UK'`, `'US'`, `'GLOBAL'`).
+By default, `LegalRegistry` serves neutral global documents at `/legal/privacy/` and `/legal/terms/` (`legal.territories = ['GLOBAL']`). Websites can customize slugs via `legal.slugs`, add arbitrary custom slugs under `content/legal/{slug}.php`, disable legal routes altogether with `'features' => ['legal_registry' => false]`, or opt in to regional statutory templates (`'IN'`, `'EU'`, `'UK'`, `'US'`) with built-in layouts for `privacy`, `terms`, `cookies`, `accessibility`, `security`, and `company`.
 
-To customize any legal document without losing territory statutory clauses, create `content/legal/{slug}.php` with `'merge_territory' => true`:
+To create a standalone custom page (such as `content/legal/refund-policy.php`), omit `'merge_territory'` and return `'sections' => [...]`. To enrich a built-in template with regional statutory clauses, create `content/legal/{slug}.php` with `'merge_territory' => true`:
 - `prepend_sections`: Array of `['id' => '...', 'title' => '...', 'body' => '<p>...</p>']` inserted before baseline sections.
 - `replace_sections`: Associative map of `'section_id' => ['title' => '...', 'body' => '...']` replacing specific baseline sections.
 - `append_sections`: Array of sections appended after baseline sections.

@@ -3,7 +3,15 @@ import { createServer } from "node:net";
 import path from "node:path";
 import type { LumoraLockfile } from "../types/config";
 import { buildWebsiteDist } from "./build-dist";
-import { evalPhpJson, loadPhpSiteConfig, loadPhpSiteRoutes, sha256File, sriSha384File, toPosixPath } from "./paths";
+import {
+  evalPhpJson,
+  loadPhpLegalSlugs,
+  loadPhpSiteConfig,
+  loadPhpSiteRoutes,
+  sha256File,
+  sriSha384File,
+  toPosixPath,
+} from "./paths";
 
 export interface GateResult {
   gate: number;
@@ -322,7 +330,7 @@ function runGate04AssetSriSynchronization(siteRoot: string): GateResult {
 }
 
 /**
- * Gate 05 — Zero Third-Party Leaks (GDPR & DPDP Act 2023)
+ * Gate 05 — Zero Third-Party Leaks & Tracking Isolation
  */
 function runGate05ZeroThirdPartyLeaks(siteRoot: string): GateResult {
   const details: string[] = [];
@@ -357,7 +365,7 @@ function runGate05ZeroThirdPartyLeaks(siteRoot: string): GateResult {
 
   return {
     gate: 5,
-    name: "Zero Third-Party Leaks (GDPR & DPDP Act 2023)",
+    name: "Zero Third-Party Leaks & Tracking Isolation",
     passed: leaks === 0,
     details,
   };
@@ -462,7 +470,7 @@ function runGate07CanonicalRouteAndSlashAudit(siteRoot: string): GateResult {
 }
 
 /**
- * Gate 08 — Statutory Legal & DPDP Portal Completeness
+ * Gate 08 — Legal Registry & Contact Route Completeness
  */
 function runGate08StatutoryLegalCompleteness(siteRoot: string): GateResult {
   const details: string[] = [];
@@ -472,20 +480,28 @@ function runGate08StatutoryLegalCompleteness(siteRoot: string): GateResult {
   const script = `
     define('LUMORA_BOOTSTRAPPED', true);
     require_once ${JSON.stringify(bootstrapPath)};
-    $cfg = \\Astrake\\Lumora\\Core\\Bootstrap::init(${JSON.stringify(rootPosix)});
-    $slugs = ['privacy', 'terms', 'cookies', 'accessibility', 'security', 'company'];
+    $cfg = \\Lumora\\Core\\Bootstrap::init(${JSON.stringify(rootPosix)});
+    $routeData = \\Lumora\\Core\\Router::loadRouteConfig(${JSON.stringify(rootPosix)});
+    $slugs = \\Lumora\\Core\\LegalRegistry::activeSlugs($cfg, ${JSON.stringify(rootPosix)});
+    $legalEnabled = !(isset($cfg['features']['legal_registry']) && $cfg['features']['legal_registry'] === false);
     $results = [];
     foreach ($slugs as $slug) {
-      $doc = \\Astrake\\Lumora\\Core\\LegalRegistry::resolveDocument($slug, $cfg, ${JSON.stringify(rootPosix)});
+      $doc = \\Lumora\\Core\\LegalRegistry::resolveDocument($slug, $cfg, ${JSON.stringify(rootPosix)});
       $results[$slug] = [
-        'ok' => is_array($doc) && !empty($doc['title']) && !empty($doc['sections']) && !empty($doc['entity_name']),
-        'entity' => $doc['entity_name'] ?? '',
+        'ok' => is_array($doc) && !empty($doc['title']) && !empty($doc['sections']),
         'sections' => is_array($doc['sections'] ?? null) ? count($doc['sections']) : 0,
       ];
     }
-    $contactRoute = \\Astrake\\Lumora\\Core\\Router::resolve('/contact/', $cfg, ${JSON.stringify(rootPosix)});
+    $hasContactRoute = isset($routeData['routes']['/contact/'])
+      && !(isset($cfg['features']['inquiry_engine']) && $cfg['features']['inquiry_engine'] === false);
+    $contactRoute = $hasContactRoute
+      ? \\Lumora\\Core\\Router::resolve('/contact/', $cfg, ${JSON.stringify(rootPosix)})
+      : ['status' => 200];
     echo json_encode([
+      'legal_enabled' => $legalEnabled,
+      'slugs' => $slugs,
       'docs' => $results,
+      'has_contact_route' => $hasContactRoute,
       'contact_status' => $contactRoute['status'] ?? 404,
       'legal_tpl_exists' => is_file(${JSON.stringify(rootPosix + "/templates/legal.php")}),
     ]);
@@ -493,41 +509,50 @@ function runGate08StatutoryLegalCompleteness(siteRoot: string): GateResult {
 
   try {
     const res = evalPhpJson<{
-      docs: Record<string, { ok: boolean; entity: string; sections: number }>;
+      legal_enabled: boolean;
+      slugs: string[];
+      docs: Record<string, { ok: boolean; sections: number }>;
+      has_contact_route: boolean;
       contact_status: number;
       legal_tpl_exists: boolean;
     }>(script, siteRoot);
 
     let issues = 0;
-    if (!res.legal_tpl_exists) {
+    if (res.legal_enabled && res.slugs.length > 0 && !res.legal_tpl_exists) {
       details.push("Missing templates/legal.php");
       issues++;
     }
-    if (res.contact_status !== 200) {
+    if (res.has_contact_route && res.contact_status !== 200) {
       details.push(`/contact/ route did not resolve to 200 (got ${res.contact_status})`);
       issues++;
     }
     for (const [slug, info] of Object.entries(res.docs)) {
       if (!info.ok) {
-        details.push(`/legal/${slug}/ failed statutory resolution`);
+        details.push(`/legal/${slug}/ failed document resolution`);
         issues++;
       }
     }
 
     if (issues === 0) {
-      details.push(`Verified all 6 statutory legal documents (/legal/{privacy,terms,cookies,accessibility,security,company}/) and /contact/?topic=privacy.`);
+      if (!res.legal_enabled && res.slugs.length === 0) {
+        details.push("Legal registry disabled by app config.");
+      } else {
+        details.push(
+          `Verified ${res.slugs.length} active legal document(s) (${res.slugs.join(", ") || "none"})${res.has_contact_route ? " and /contact/ route" : ""}.`
+        );
+      }
     }
 
     return {
       gate: 8,
-      name: "Statutory Legal & DPDP Portal Completeness",
+      name: "Legal Registry & Contact Route Completeness",
       passed: issues === 0,
       details,
     };
   } catch (err) {
     return {
       gate: 8,
-      name: "Statutory Legal & DPDP Portal Completeness",
+      name: "Legal Registry & Contact Route Completeness",
       passed: false,
       details: [err instanceof Error ? err.message : String(err)],
     };
@@ -553,7 +578,7 @@ function runGate09InquiryEngineAndSqliteWalSmoke(siteRoot: string): GateResult {
     $_SERVER['HTTP_USER_AGENT'] = 'Lumora-Gate09-Smoke/1.0';
     require_once ${JSON.stringify(bootstrapPath)};
 
-    $cfg = \\Astrake\\Lumora\\Core\\Bootstrap::init(${JSON.stringify(siteRootPosix)});
+    $cfg = \\Lumora\\Core\\Bootstrap::init(${JSON.stringify(siteRootPosix)});
     $cfg['hub'] = [
       'enabled' => false,
       'endpoint' => 'https://hub.example.invalid/api/v1/lumora/inquiries/ingest',
@@ -571,17 +596,17 @@ function runGate09InquiryEngineAndSqliteWalSmoke(siteRoot: string): GateResult {
     }
 
     $now = time();
-    $csrf = \\Astrake\\Lumora\\Core\\Security::csrfToken(${JSON.stringify(tempRootPosix)}, $now - 5);
+    $csrf = \\Lumora\\Core\\Security::csrfToken(${JSON.stringify(tempRootPosix)}, $now - 5);
 
     // 1. Honeypot test (attempt #1)
-    $hpRes = \\Astrake\\Lumora\\Core\\InquiryEngine::handle($cfg, ${JSON.stringify(tempRootPosix)}, [
+    $hpRes = \\Lumora\\Core\\InquiryEngine::handle($cfg, ${JSON.stringify(tempRootPosix)}, [
       'website_url' => 'http://spam.invalid',
       '_ts' => (string)($now - 5),
       '_csrf' => $csrf,
     ], $now);
 
     // 2. Timing trap test <2s (attempt #2)
-    $timingRes = \\Astrake\\Lumora\\Core\\InquiryEngine::handle($cfg, ${JSON.stringify(tempRootPosix)}, [
+    $timingRes = \\Lumora\\Core\\InquiryEngine::handle($cfg, ${JSON.stringify(tempRootPosix)}, [
       'website_url' => '',
       '_ts' => (string)$now,
       '_csrf' => $csrf,
@@ -593,7 +618,7 @@ function runGate09InquiryEngineAndSqliteWalSmoke(siteRoot: string): GateResult {
     ], $now);
 
     // 3. Invalid CSRF test (attempt #3)
-    $csrfRes = \\Astrake\\Lumora\\Core\\InquiryEngine::handle($cfg, ${JSON.stringify(tempRootPosix)}, [
+    $csrfRes = \\Lumora\\Core\\InquiryEngine::handle($cfg, ${JSON.stringify(tempRootPosix)}, [
       'website_url' => '',
       '_ts' => (string)($now - 5),
       '_csrf' => 'invalid.token.mac',
@@ -606,44 +631,44 @@ function runGate09InquiryEngineAndSqliteWalSmoke(siteRoot: string): GateResult {
 
     // 4. Valid submission test: SQLite WAL + JSONL + HMAC signature (attempt #4)
     $t0 = hrtime(true);
-    $validRes = \\Astrake\\Lumora\\Core\\InquiryEngine::handle($cfg, ${JSON.stringify(tempRootPosix)}, [
+    $validRes = \\Lumora\\Core\\InquiryEngine::handle($cfg, ${JSON.stringify(tempRootPosix)}, [
       'website_url' => '',
       '_ts' => (string)($now - 5),
       '_csrf' => $csrf,
-      'name' => 'Aarav Sen',
-      'organization' => 'Astrake Verification Lab',
-      'email' => 'aarav@astrake.com',
-      'phone' => '+91 98300 00000',
-      'subject' => 'Enterprise Architecture Inquiry',
+      'name' => 'Alex Rivera',
+      'organization' => 'Verification Test Org',
+      'email' => 'alex@example.com',
+      'phone' => '+1 555 010 0199',
+      'subject' => 'Platform Architecture Inquiry',
       'message' => 'Verifying sub-millisecond SQLite WAL persistence and JSONL backup.',
       'consent' => '1',
     ], $now);
     $elapsedMs = (hrtime(true) - $t0) / 1e6;
 
     // 5. Attempt #5 (consumes 5th rate limit slot)
-    \\Astrake\\Lumora\\Core\\InquiryEngine::handle($cfg, ${JSON.stringify(tempRootPosix)}, [
+    \\Lumora\\Core\\InquiryEngine::handle($cfg, ${JSON.stringify(tempRootPosix)}, [
       'website_url' => '',
       '_ts' => (string)($now - 5),
       '_csrf' => 'invalid',
     ], $now);
 
     // 6. Attempt #6 -> MUST be blocked by pre-CSRF rate limiter (5 / 900s) even with valid CSRF
-    $rateLimitRes = \\Astrake\\Lumora\\Core\\InquiryEngine::handle($cfg, ${JSON.stringify(tempRootPosix)}, [
+    $rateLimitRes = \\Lumora\\Core\\InquiryEngine::handle($cfg, ${JSON.stringify(tempRootPosix)}, [
       'website_url' => '',
       '_ts' => (string)($now - 5),
       '_csrf' => $csrf,
-      'name' => 'Aarav Sen',
-      'email' => 'aarav@astrake.com',
+      'name' => 'Alex Rivera',
+      'email' => 'alex@example.com',
       'subject' => 'Should be rate limited',
       'message' => 'This 6th attempt must be blocked before CSRF or validation.',
       'consent' => '1',
     ], $now);
 
-    $vaultDir = \\Astrake\\Lumora\\Core\\Security::vaultDir(${JSON.stringify(tempRootPosix)});
+    $vaultDir = \\Lumora\\Core\\Security::vaultDir(${JSON.stringify(tempRootPosix)});
     $sqliteExists = is_file($vaultDir . '/lumora.sqlite');
     $jsonlExists = is_file($vaultDir . '/contacts-backup.jsonl');
 
-    \\Astrake\\Lumora\\Core\\InquiryDb::resetConnection();
+    \\Lumora\\Core\\InquiryDb::resetConnection();
 
     echo json_encode([
       'honeypot_caught' => ($hpRes['success'] === false || !empty($hpRes['receipt'])),
@@ -750,7 +775,7 @@ async function runGate10LiveHttpSecurityHeaderAudit(siteRoot: string): Promise<G
   });
 
   try {
-    const ready = await waitForServer(`${baseUrl}/health`);
+    const ready = await waitForServer(`${baseUrl}/`);
     if (!ready) {
       return {
         gate: 10,
@@ -793,26 +818,48 @@ async function runGate10LiveHttpSecurityHeaderAudit(siteRoot: string): Promise<G
       }
     }
 
-    const discoveryPaths = [
-      "/health",
-      "/robots.txt",
-      "/sitemap.xml",
-      "/llms.txt",
-      "/llms-full.txt",
-      "/.well-known/security.txt",
-      "/site.webmanifest",
+    const siteConfig = loadPhpSiteConfig(siteRoot) as {
+      brand?: { security_email?: string };
+      discovery?: {
+        health?: boolean;
+        robots_txt?: boolean;
+        sitemap_xml?: boolean;
+        llms_txt?: boolean;
+        security_txt?: boolean;
+        webmanifest?: boolean;
+      };
+    };
+    const disc = siteConfig.discovery ?? {};
+    const brand = siteConfig.brand ?? {};
+    const securityTxtEnabled =
+      disc.security_txt !== undefined
+        ? Boolean(disc.security_txt)
+        : Boolean(brand.security_email) || existsSync(path.join(siteRoot, ".well-known", "security.txt"));
+
+    const discoveryPaths: Array<{ path: string; enabled: boolean }> = [
+      { path: "/health", enabled: disc.health !== false },
+      { path: "/robots.txt", enabled: disc.robots_txt !== false },
+      { path: "/sitemap.xml", enabled: disc.sitemap_xml !== false },
+      { path: "/llms.txt", enabled: disc.llms_txt !== false },
+      { path: "/llms-full.txt", enabled: disc.llms_txt !== false },
+      { path: "/.well-known/security.txt", enabled: securityTxtEnabled },
+      { path: "/site.webmanifest", enabled: disc.webmanifest !== false },
     ];
-    for (const p of discoveryPaths) {
-      const res = await fetch(`${baseUrl}${p}`, { redirect: "manual" });
+
+    let checkedDiscovery = 0;
+    for (const item of discoveryPaths) {
+      if (!item.enabled) continue;
+      checkedDiscovery++;
+      const res = await fetch(`${baseUrl}${item.path}`, { redirect: "manual" });
       if (res.status !== 200) {
-        details.push(`Expected 200 OK on discovery endpoint ${p}, got ${res.status}`);
+        details.push(`Expected 200 OK on discovery endpoint ${item.path}, got ${res.status}`);
         failures++;
       }
     }
 
     if (failures === 0) {
       details.push(
-        `Verified 8 security headers on GET /, 403 isolation on /core/, /lumora.config.php, /storage/, and 200 OK across all 7 discovery endpoints.`
+        `Verified 8 security headers on GET /, 403 isolation on /core/, /lumora.config.php, /storage/, and 200 OK across ${checkedDiscovery} enabled discovery endpoint(s).`
       );
     }
 
@@ -950,14 +997,18 @@ async function runGate12DistProductionServerSmoke(siteRoot: string): Promise<Gat
       }
     }
 
-    // Also test a statutory legal route stub in dist/
-    const privacyRes = await fetch(`${baseUrl}/legal/privacy/`, { redirect: "manual" });
-    const privacyBody = await privacyRes.text();
-    if (privacyRes.status !== 200 || !privacyRes.headers.get("content-security-policy") || privacyBody.includes("Fatal error:")) {
-      details.push(`dist/ route /legal/privacy/ failed (status=${privacyRes.status})`);
-      failures++;
-    } else {
-      checked++;
+    // Test the first active app-configured legal route stub in dist/ (if legal_registry is enabled)
+    const activeLegalSlugs = loadPhpLegalSlugs(siteRoot);
+    if (activeLegalSlugs.length > 0) {
+      const legalPath = `/legal/${activeLegalSlugs[0]}/`;
+      const legalRes = await fetch(`${baseUrl}${legalPath}`, { redirect: "manual" });
+      const legalBody = await legalRes.text();
+      if (legalRes.status !== 200 || !legalRes.headers.get("content-security-policy") || legalBody.includes("Fatal error:")) {
+        details.push(`dist/ route ${legalPath} failed (status=${legalRes.status})`);
+        failures++;
+      } else {
+        checked++;
+      }
     }
 
     // Verify 301 legacy redirects in dist/

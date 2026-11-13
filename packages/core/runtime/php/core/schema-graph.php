@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Astrake\Lumora\Core;
+namespace Lumora\Core;
 
 if (!defined('LUMORA_BOOTSTRAPPED')) {
     http_response_code(403);
@@ -16,13 +16,21 @@ final class SchemaGraph
     public static function build(array $config, array $meta = []): array
     {
         $brand = $config['brand'] ?? [];
+        $features = $config['features'] ?? [];
         $origin = rtrim((string)($brand['origin'] ?? 'https://localhost'), '/');
         $brandName = (string)($brand['name'] ?? 'Lumora');
-        $legalEntity = (string)($brand['legal_entity'] ?? $brandName);
-        $locale = (string)($brand['locale'] ?? 'en-IN');
+        $legalEntity = trim((string)($brand['legal_entity'] ?? ''));
+        $locale = (string)($brand['locale'] ?? 'en');
         $category = (string)($brand['category'] ?? 'BusinessApplication');
         $slogan = (string)($brand['slogan'] ?? '');
         $addr = is_array($brand['address'] ?? null) ? $brand['address'] : [];
+
+        $allowedEntityTypes = ['Organization', 'Person', 'LocalBusiness', 'Corporation', 'ProfessionalService'];
+        $requestedType = (string)($brand['schema_org_type'] ?? 'Organization');
+        $entityType = in_array($requestedType, $allowedEntityTypes, true) ? $requestedType : 'Organization';
+        $isPerson = ($entityType === 'Person');
+        $primaryId = $origin . ($isPerson ? '/#person' : '/#organization');
+        $primaryRef = ['@id' => $primaryId];
 
         $title = (string)($meta['title'] ?? $brandName);
         $description = (string)($meta['description'] ?? ($brand['description'] ?? $slogan));
@@ -31,81 +39,147 @@ final class SchemaGraph
         $schemaType = (string)($meta['schema_type'] ?? 'home');
         $routePath = (string)($meta['path'] ?? '/');
 
-        $orgNode = [
-            '@type'        => 'Organization',
-            '@id'          => $origin . '/#organization',
-            'name'         => $brandName,
-            'legalName'    => $legalEntity,
-            'url'          => $origin . '/',
-            'description'  => $description,
-            'logo'         => [
-                '@type' => 'ImageObject',
-                '@id'   => $origin . '/#logo',
-                'url'   => $origin . (string)($brand['logo'] ?? '/public/brand/icon.svg'),
-            ],
-            'contactPoint' => [
-                [
-                    '@type'             => 'ContactPoint',
-                    'url'               => $origin . '/contact/',
-                    'contactType'       => 'customer service',
-                    'availableLanguage' => ['English'],
-                ],
-                [
-                    '@type'             => 'ContactPoint',
-                    'url'               => $origin . '/contact/?topic=security',
-                    'contactType'       => 'security reporting',
-                    'availableLanguage' => ['English'],
-                ],
-                [
-                    '@type'             => 'ContactPoint',
-                    'url'               => $origin . '/contact/?topic=privacy',
-                    'contactType'       => 'data protection officer',
-                    'availableLanguage' => ['English'],
-                ],
-            ],
+        $logoSetting = (string)($brand['logo'] ?? '/public/brand/icon.svg');
+        $logoUrl = str_starts_with($logoSetting, 'http')
+            ? $logoSetting
+            : $origin . '/' . ltrim($logoSetting, '/');
+
+        $primaryNode = [
+            '@type'       => $entityType,
+            '@id'         => $primaryId,
+            'name'        => $brandName,
+            'url'         => $origin . '/',
+            'description' => $description,
         ];
 
-        if (!empty($addr)) {
-            $orgNode['address'] = [
-                '@type'           => 'PostalAddress',
-                'streetAddress'   => (string)($addr['street'] ?? ''),
-                'addressLocality' => (string)($addr['locality'] ?? ''),
-                'addressRegion'   => (string)($addr['region'] ?? ''),
-                'postalCode'      => (string)($addr['postal_code'] ?? ''),
-                'addressCountry'  => (string)($addr['country'] ?? 'IN'),
+        if ($legalEntity !== '' && !empty($brand['expose_legal_entity_in_schema'])) {
+            $primaryNode['legalName'] = $legalEntity;
+        }
+
+        if ($isPerson) {
+            $primaryNode['image'] = !empty($brand['logo']) ? $logoUrl : $imageUrl;
+        } else {
+            $primaryNode['logo'] = [
+                '@type' => 'ImageObject',
+                '@id'   => $origin . '/#logo',
+                'url'   => $logoUrl,
             ];
         }
 
-        $graph = [
-            $orgNode,
-            [
+        if (!empty($brand['same_as']) && is_array($brand['same_as'])) {
+            $sameAs = array_values(array_filter(array_map('strval', $brand['same_as']), static fn(string $u): bool => $u !== ''));
+            if (!empty($sameAs)) {
+                $primaryNode['sameAs'] = $sameAs;
+            }
+        }
+
+        if (!empty($brand['contact_points']) && is_array($brand['contact_points'])) {
+            $contactPoints = [];
+            foreach ($brand['contact_points'] as $cpItem) {
+                if (!is_array($cpItem)) {
+                    continue;
+                }
+                $cp = [
+                    '@type'             => 'ContactPoint',
+                    'contactType'       => (string)($cpItem['contact_type'] ?? 'customer support'),
+                    'availableLanguage' => !empty($cpItem['available_language']) && is_array($cpItem['available_language'])
+                        ? array_values($cpItem['available_language'])
+                        : ['English'],
+                ];
+                if (!empty($cpItem['url'])) {
+                    $cpUrl = (string)$cpItem['url'];
+                    $cp['url'] = str_starts_with($cpUrl, 'http')
+                        ? $cpUrl
+                        : $origin . '/' . ltrim($cpUrl, '/');
+                }
+                if (!empty($cpItem['email'])) {
+                    $cp['email'] = (string)$cpItem['email'];
+                }
+                $contactPoints[] = $cp;
+            }
+            if (!empty($contactPoints)) {
+                $primaryNode['contactPoint'] = $contactPoints;
+            }
+        } elseif (!$isPerson && ((!isset($features['inquiry_engine']) || $features['inquiry_engine'] !== false) || !empty($brand['contact_email']))) {
+            $defaultCp = [
+                '@type'             => 'ContactPoint',
+                'contactType'       => 'customer support',
+                'availableLanguage' => ['English'],
+            ];
+            if (!isset($features['inquiry_engine']) || $features['inquiry_engine'] !== false) {
+                $defaultCp['url'] = $origin . '/contact/';
+            }
+            if (!empty($brand['contact_email'])) {
+                $defaultCp['email'] = (string)$brand['contact_email'];
+            }
+            $primaryNode['contactPoint'] = [$defaultCp];
+        }
+
+        if (!empty($addr)) {
+            $addressProps = array_filter([
+                'streetAddress'   => trim((string)($addr['street'] ?? '')),
+                'addressLocality' => trim((string)($addr['locality'] ?? '')),
+                'addressRegion'   => trim((string)($addr['region'] ?? '')),
+                'postalCode'      => trim((string)($addr['postal_code'] ?? '')),
+                'addressCountry'  => trim((string)($addr['country'] ?? '')),
+            ], static fn(string $v): bool => $v !== '');
+
+            if (!empty($addressProps)) {
+                $primaryNode['address'] = ['@type' => 'PostalAddress'] + $addressProps;
+            }
+        }
+
+        $graph = [$primaryNode];
+
+        $emitBrandNode = array_key_exists('emit_brand_node', $brand)
+            ? !empty($brand['emit_brand_node'])
+            : !$isPerson;
+
+        if ($emitBrandNode) {
+            $brandNode = [
                 '@type'       => 'Brand',
                 '@id'         => $origin . '/#brand',
                 'name'        => $brandName,
                 'url'         => $origin . '/',
-                'slogan'      => $slogan,
                 'description' => $description,
-            ],
-            [
-                '@type'      => 'WebSite',
-                '@id'        => $origin . '/#website',
-                'url'        => $origin . '/',
-                'name'       => $brandName,
-                'publisher'  => ['@id' => $origin . '/#organization'],
-                'inLanguage' => $locale,
-            ],
-            [
+            ];
+            if ($slogan !== '') {
+                $brandNode['slogan'] = $slogan;
+            }
+            $graph[] = $brandNode;
+        }
+
+        $graph[] = [
+            '@type'      => 'WebSite',
+            '@id'        => $origin . '/#website',
+            'url'        => $origin . '/',
+            'name'       => $brandName,
+            'publisher'  => $primaryRef,
+            'inLanguage' => $locale,
+        ];
+
+        $shouldEmitSoftware = !empty($brand['primary_offering_schema'])
+            || $schemaType === 'software'
+            || !empty($meta['software_schema']);
+
+        if ($shouldEmitSoftware) {
+            $softwareNode = [
                 '@type'               => 'SoftwareApplication',
                 '@id'                 => $origin . '/#software',
                 'name'                => $brandName,
                 'applicationCategory' => $category,
-                'operatingSystem'     => (string)($brand['operating_system'] ?? 'Web, Linux, Windows, macOS'),
                 'description'         => $description,
                 'image'               => $imageUrl,
-                'brand'               => ['@id' => $origin . '/#brand'],
-                'publisher'           => ['@id' => $origin . '/#organization'],
-            ],
-        ];
+                'publisher'           => $primaryRef,
+            ];
+            if (!empty($brand['operating_system'])) {
+                $softwareNode['operatingSystem'] = (string)$brand['operating_system'];
+            }
+            if ($emitBrandNode) {
+                $softwareNode['brand'] = ['@id' => $origin . '/#brand'];
+            }
+            $graph[] = $softwareNode;
+        }
 
         // Add BreadcrumbList for non-root pages
         if ($routePath !== '/' && $routePath !== '') {
@@ -152,7 +226,7 @@ final class SchemaGraph
                 'headline'         => $title,
                 'description'      => $description,
                 'proficiencyLevel' => 'Beginner',
-                'publisher'        => ['@id' => $origin . '/#organization'],
+                'publisher'        => $primaryRef,
             ];
         } elseif ($schemaType === 'blog') {
             $graph[] = [
@@ -160,7 +234,7 @@ final class SchemaGraph
                 '@id'         => $canonicalUrl . '#post',
                 'headline'    => $title,
                 'description' => $description,
-                'publisher'   => ['@id' => $origin . '/#organization'],
+                'publisher'   => $primaryRef,
             ];
         } elseif ($schemaType === 'legal') {
             $graph[] = [
@@ -170,7 +244,7 @@ final class SchemaGraph
                 'name'        => $title,
                 'description' => $description,
                 'isPartOf'    => ['@id' => $origin . '/#website'],
-                'publisher'   => ['@id' => $origin . '/#organization'],
+                'publisher'   => $primaryRef,
             ];
         }
 
@@ -197,9 +271,24 @@ final class SchemaGraph
             }
         }
 
+        if (!empty($meta['schema_nodes']) && is_array($meta['schema_nodes'])) {
+            foreach ($meta['schema_nodes'] as $extraNode) {
+                if (is_array($extraNode) && !empty($extraNode)) {
+                    $graph[] = $extraNode;
+                }
+            }
+        }
+
         return [
             '@context' => 'https://schema.org',
             '@graph'   => $graph,
         ];
     }
+}
+
+if (
+    class_exists(\Lumora\Core\SchemaGraph::class, false)
+    && !class_exists(\Astrake\Lumora\Core\SchemaGraph::class, false)
+) {
+    class_alias(\Lumora\Core\SchemaGraph::class, \Astrake\Lumora\Core\SchemaGraph::class);
 }

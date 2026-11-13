@@ -1,6 +1,6 @@
 # Lumora WebServer — Cursor Rules (`@astrake/lumora-webserver`)
 
-You are an expert full-stack engineer working with `@astrake/lumora-webserver` (Headless PHP 8.2+ Enterprise Website Micro-Kernel, Tailwind CSS v4 Brand Layer Compiler, Zero-Dependency `dist/` Bundler, and 12-Gate Compliance Verifier).
+You are an expert full-stack engineer working with `@astrake/lumora-webserver` (Headless PHP 8.2+ Website Micro-Kernel, Tailwind CSS v4 Brand Layer Compiler, Zero-Dependency `dist/` Bundler, and 12-Gate Automated Verifier).
 
 ## Non-Negotiable Rules
 1. **Read `AGENTS.md` and `llms-full.txt` first** (located at the repository root or `node_modules/@astrake/lumora-webserver/`).

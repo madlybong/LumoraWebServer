@@ -1,12 +1,12 @@
 # @astrake/lumora-webserver
 
-> `@astrake/lumora-webserver` (`v0.1.0`) is the enterprise website framework of the Lumora ecosystem: a zero-dependency headless PHP 8.2+ micro-kernel, Tailwind CSS v4 brand layer compiler, zero-rewrite `dist/` bundler (`cPanel` / `aaPanel` / `Apache` / `Nginx`), and 12-Gate Automated Compliance Verifier.
+> `@astrake/lumora-webserver` (`v0.1.2`) is a brand-neutral, zero-dependency headless PHP 8.2+ website micro-kernel, Tailwind CSS v4 brand layer compiler, zero-rewrite `dist/` bundler (`cPanel` / `aaPanel` / `Apache` / `Nginx`), and 12-Gate Automated Verifier.
 
 ## Documentation & Specifications
 
 - [Full LLM & Agent Context (`llms-full.txt`)](./llms-full.txt): Complete single-file API reference, PHP/TS schemas, template helpers, and 12-Gate specification.
 - [AI Coding Agent Operating Guide (`AGENTS.md`)](./AGENTS.md): Mandatory rules, PHP global helpers, template context variables, and DOM data attributes.
-- [Project Overview (`docs/PROJECT.md`)](./docs/PROJECT.md): Ecosystem architecture, security posture, and statutory compliance scope.
+- [Project Overview (`docs/PROJECT.md`)](./docs/PROJECT.md): Ecosystem architecture, security posture, and configurable compliance controls.
 - [System Architecture (`docs/ARCHITECTURE.md`)](./docs/ARCHITECTURE.md): Request lifecycle, v2 CGNAT-safe CSRF, SQLite3 WAL + JSONL persistence, and CSS compilation pipeline.
 - [User Guide — Getting Started (`docs/user/GETTING_STARTED.md`)](./docs/user/GETTING_STARTED.md): Scaffolding, building templates, adding routes/channels/docs/blog, and running `lumora-web`.
 - [User Guide — Configuration Reference (`docs/user/CONFIGURATION.md`)](./docs/user/CONFIGURATION.md): Exhaustive schema reference for `lumora.config.php`, `content/routes.php`, `content/channels.php`, and `content/legal/{slug}.php`.
@@ -14,21 +14,21 @@
 - [Developer Guide — Contributing (`docs/developer/CONTRIBUTING.md`)](./docs/developer/CONTRIBUTING.md): Monorepo structure, PHP 8.2+ & TypeScript coding conventions, and release workflow.
 - [Developer Guide — Testing & 12-Gate Verifier (`docs/developer/TESTING.md`)](./docs/developer/TESTING.md): Test architecture and detailed breakdown of all 12 compliance gates.
 
-## Headless PHP 8.2+ Core (`packages/core/runtime/php/core/`)
+## Headless PHP 8.2+ Core (`packages/core/runtime/php/core/`, namespace `Lumora\Core` + `Astrake\Lumora\Core` alias)
 
-- `Astrake\Lumora\Core\Bootstrap` (`bootstrap.php`): Front-controller lifecycle (`Bootstrap::init()`, `Bootstrap::handleRequest()`).
-- `Astrake\Lumora\Core\Security` (`security.php`): 8 OWASP ASVS v4.0 L2 headers, 128-bit CSP nonce, CGNAT-safe stateless v2 HMAC-SHA256 CSRF, keyed `ip_hash`, and `storage/vault-<hmac>/` isolation.
-- `Astrake\Lumora\Core\Router` (`router.php`): 403 internal path blocker, 301 trailing-slash normalizer, subfolder base-path detector, and route resolver.
-- `Astrake\Lumora\Core\Discovery` (`discovery.php`): Serves `/health`, `/robots.txt`, `/sitemap.xml`, `/llms.txt`, `/llms-full.txt`, `/.well-known/security.txt`, `/site.webmanifest`, and `POST /_lumora/outbox/flush`.
-- `Astrake\Lumora\Core\Render` (`render.php`): Escaping (`e()`), components (`component()`), SRI cache-busted asset URLs (`asset_url()`, `asset_sri()`), and `<head>` meta/preload/JSON-LD generator (`lumora_head_meta()`).
-- `Astrake\Lumora\Core\SchemaGraph` (`schema-graph.php`): Deterministic Schema.org JSON-LD `@graph` builder (`Organization`, `Brand`, `WebSite`, `SoftwareApplication`, `BreadcrumbList`, `ContactPage`, `TechArticle`, `BlogPosting`, `WebPage`, `FAQPage`).
-- `Astrake\Lumora\Core\InquiryEngine` (`inquiry-engine.php`): Declarative multi-channel form processor (`content/channels.php`) enforcing pre-CSRF rate limit (`5/900s`), honeypot, `<2s` timing guard, v2 CSRF, and custom field rules.
-- `Astrake\Lumora\Core\InquiryDb` (`inquiry-db.php`): SQLite3 WAL (`lumora.sqlite`) + atomic `flock` JSONL backup (`contacts-backup.jsonl`), 90d DPDP PII redaction, and 180d CERT-In log purge.
-- `Astrake\Lumora\Core\HubClient` (`hub-client.php`): Standalone Edge notifications (native TLS SMTP socket + self-hosted WAHA/Evolution/Webhook WhatsApp) and HMAC-SHA256 webhook outbox sync (`X-Lumora-Signature: sha256=...`).
-- `Astrake\Lumora\Core\LegalRegistry` (`legal-registry.php`): Parameterized territory legal generator (`IN`, `EU`, `UK`, `US`, `GLOBAL`) for `/legal/{privacy,terms,cookies,accessibility,security,company}/` with project overrides (`content/legal/{slug}.php`).
-- `Astrake\Lumora\Core\DocsEngine` (`docs-engine.php`): Manifest-jailed Markdown parser with GitHub alerts, tables, auto-TOC, full-text search, and `dist/` manifest inlining.
-- `Astrake\Lumora\Core\BlogEngine` (`blog-engine.php`): File-based PHP blog engine with pagination, localhost draft guard, and `/blog/feed.xml` Atom 1.0 feed.
-- `Astrake\Lumora\Core\ReleaseServer` (`release-server.php`): RFC 9110 `Range` (`206 Partial Content`) binary artifact server (`/releases/*`, `release-manifest.json`, `SHA256SUMS`) with `X-Checksum-Sha256`.
+- `Lumora\Core\Bootstrap` (`bootstrap.php`): Front-controller lifecycle (`Bootstrap::init()`, `Bootstrap::handleRequest()`).
+- `Lumora\Core\Security` (`security.php`): 8 OWASP ASVS v4.0 L2 headers, 128-bit CSP nonce, opt-in `compat_constants`, CGNAT-safe stateless v2 HMAC-SHA256 CSRF, keyed `ip_hash`, and `storage/vault-<hmac>/` isolation.
+- `Lumora\Core\Router` (`router.php`): 403 internal path blocker, 301 trailing-slash normalizer, subfolder base-path detector, and route resolver.
+- `Lumora\Core\Discovery` (`discovery.php`): Configurable discovery endpoints (`/health`, `/robots.txt`, `/sitemap.xml`, `/llms.txt` with `BlogEngine` post indexing & `content/llms.php` overrides, `/llms-full.txt`, `/.well-known/security.txt`, `/site.webmanifest`, and `POST /_lumora/outbox/flush`).
+- `Lumora\Core\Render` (`render.php`): Escaping (`e()`), components (`component()`), SRI cache-busted asset URLs (`asset_url()`, `asset_sri()`), and `<head>` meta/preload/JSON-LD generator (`lumora_head_meta()`).
+- `Lumora\Core\SchemaGraph` (`schema-graph.php`): Deterministic Schema.org JSON-LD `@graph` builder (`Organization`, `Person`, `LocalBusiness`, optional `Brand` / `SoftwareApplication`, `WebSite`, `BreadcrumbList`, `ContactPage`, `TechArticle`, `BlogPosting`, `WebPage`, `FAQPage`, plus per-route `schema_nodes`).
+- `Lumora\Core\InquiryEngine` (`inquiry-engine.php`): Declarative app-owned multi-channel form processor (`content/channels.php`) enforcing pre-CSRF rate limit (`5/900s`), honeypot, `<2s` timing guard, v2 CSRF, custom field rules, and first-party UTM/CTA attribution.
+- `Lumora\Core\InquiryDb` (`inquiry-db.php`): SQLite3 WAL (`lumora.sqlite`) + atomic `flock` JSONL backup (`contacts-backup.jsonl`) and configurable PII (`[REDACTED]`) & log retention (`0` disables pruning).
+- `Lumora\Core\HubClient` (`hub-client.php`): Standalone Edge notifications (native TLS SMTP socket + self-hosted WAHA/Evolution/Webhook WhatsApp) and HMAC-SHA256 webhook outbox sync (`X-Lumora-Signature: sha256=...`, wire schema `1.0` / `1.1`).
+- `Lumora\Core\LegalRegistry` (`legal-registry.php`): App-driven legal document registry defaulting to `'GLOBAL'` + `['privacy', 'terms']`, with opt-in regional compliance templates (`IN`, `EU`, `UK`, `US`), custom `content/legal/{slug}.php` documents, and `features.legal_registry = false` support.
+- `Lumora\Core\DocsEngine` (`docs-engine.php`): Manifest-jailed Markdown parser with GitHub alerts, tables, auto-TOC, full-text search, and `dist/` manifest inlining.
+- `Lumora\Core\BlogEngine` (`blog-engine.php`): File-based PHP blog engine with pagination, localhost draft guard, and `/blog/feed.xml` Atom 1.0 feed.
+- `Lumora\Core\ReleaseServer` (`release-server.php`): RFC 9110 `Range` (`206 Partial Content`) binary artifact server (`/releases/*`, `release-manifest.json`, `SHA256SUMS`) with `X-Checksum-Sha256`.
 
 ## CLI Commands (`lumora-web`)
 

@@ -22,8 +22,8 @@ export function flushOutbox(options: FlushOutboxOptions = {}): FlushOutboxResult
   const script = `
     define('LUMORA_BOOTSTRAPPED', true);
     require_once ${JSON.stringify(bootstrapPosix)};
-    $cfg = \\Astrake\\Lumora\\Core\\Bootstrap::init(${JSON.stringify(rootPosix)});
-    $res = \\Astrake\\Lumora\\Core\\HubClient::flushPendingOutbox($cfg, ${JSON.stringify(rootPosix)}, ${limit});
+    $cfg = \\Lumora\\Core\\Bootstrap::init(${JSON.stringify(rootPosix)});
+    $res = \\Lumora\\Core\\HubClient::flushPendingOutbox($cfg, ${JSON.stringify(rootPosix)}, ${limit});
     echo json_encode($res);
   `;
 

@@ -1,6 +1,6 @@
 {
   "name": "lumora-web-starter",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Reference Enterprise Website powered by @astrake/lumora-webserver (Headless PHP 8.2+ Micro-Kernel + Tailwind CSS v4).",
   "type": "module",

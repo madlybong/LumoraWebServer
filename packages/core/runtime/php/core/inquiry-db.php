@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Astrake\Lumora\Core;
+namespace Lumora\Core;
 
 use PDO;
 use Throwable;
@@ -98,40 +98,50 @@ final class InquiryDb
     }
 
     /**
-     * Enforces statutory data retention schedules on write operations:
-     * 1. DPDP Act 2023 Sec. 8(7) (default 90 days): Redacts PII & message body while preserving receipt_id & ip_hash.
-     * 2. CERT-In Directions (default 180 days): Permanently purges records and rate-limit logs older than 180 days.
+     * Enforces configurable data retention schedules on write operations:
+     * 1. PII Redaction (`retention_days_pii`, default 90; 0 or null disables redaction).
+     * 2. Log Purge (`retention_days_logs`, default 180; 0 or null disables log purge).
      */
     public static function prune(PDO $pdo, array $config = []): void
     {
         try {
-            $piiDays = max(1, (int)($config['legal']['retention_days_pii'] ?? 90));
-            $logDays = max($piiDays, (int)($config['legal']['retention_days_logs'] ?? 180));
+            $rawPii = $config['legal']['retention_days_pii'] ?? 90;
+            $rawLogs = $config['legal']['retention_days_logs'] ?? 180;
+            $piiDays = $rawPii === null ? 0 : max(0, (int)$rawPii);
+            $logDays = $rawLogs === null ? 0 : max(0, (int)$rawLogs);
+            if ($piiDays > 0 && $logDays > 0 && $logDays < $piiDays) {
+                $logDays = $piiDays;
+            }
 
-            $piiCutoff = gmdate('Y-m-d\TH:i:s\Z', time() - ($piiDays * 86400));
-            $logCutoff = gmdate('Y-m-d\TH:i:s\Z', time() - ($logDays * 86400));
+            if ($piiDays > 0) {
+                $piiCutoff = gmdate('Y-m-d\TH:i:s\Z', time() - ($piiDays * 86400));
+                $stmtRedact = $pdo->prepare('
+                    UPDATE contact_submissions
+                    SET full_name = "[REDACTED]",
+                        organization = "",
+                        email = "redacted@lumora.invalid",
+                        phone = "",
+                        subject = "[REDACTED]",
+                        message = "[REDACTED AFTER CONFIGURED RETENTION WINDOW]",
+                        facility_location = "",
+                        details_json = "{}",
+                        user_agent = ""
+                    WHERE created_at < :pii_cutoff
+                      AND full_name NOT IN ("[REDACTED]", "[REDACTED-90D]")
+                ');
+                $stmtRedact->execute([':pii_cutoff' => $piiCutoff]);
+            }
 
-            $stmtRedact = $pdo->prepare('
-                UPDATE contact_submissions
-                SET full_name = "[REDACTED-90D]",
-                    organization = "",
-                    email = "redacted@lumora.invalid",
-                    phone = "",
-                    subject = "[REDACTED-90D]",
-                    message = "[REDACTED AFTER STATUTORY RETENTION WINDOW]",
-                    facility_location = "",
-                    details_json = "{}",
-                    user_agent = ""
-                WHERE created_at < :pii_cutoff
-                  AND full_name != "[REDACTED-90D]"
-            ');
-            $stmtRedact->execute([':pii_cutoff' => $piiCutoff]);
+            if ($logDays > 0) {
+                $logCutoff = gmdate('Y-m-d\TH:i:s\Z', time() - ($logDays * 86400));
+                if ($piiDays > 0) {
+                    $stmtPurge = $pdo->prepare('DELETE FROM contact_submissions WHERE created_at < :log_cutoff');
+                    $stmtPurge->execute([':log_cutoff' => $logCutoff]);
+                }
 
-            $stmtPurge = $pdo->prepare('DELETE FROM contact_submissions WHERE created_at < :log_cutoff');
-            $stmtPurge->execute([':log_cutoff' => $logCutoff]);
-
-            $stmtRatePurge = $pdo->prepare('DELETE FROM contact_rate_limits WHERE created_at < :log_cutoff');
-            $stmtRatePurge->execute([':log_cutoff' => $logCutoff]);
+                $stmtRatePurge = $pdo->prepare('DELETE FROM contact_rate_limits WHERE created_at < :log_cutoff');
+                $stmtRatePurge->execute([':log_cutoff' => $logCutoff]);
+            }
         } catch (Throwable) {
             // Non-blocking
         }
@@ -429,7 +439,7 @@ final class InquiryDb
                 SELECT *
                 FROM contact_submissions
                 WHERE sync_status IN ("pending", "failed")
-                  AND full_name != "[REDACTED-90D]"
+                  AND full_name NOT IN ("[REDACTED]", "[REDACTED-90D]")
                 ORDER BY id ASC
                 LIMIT :lim
             ');
@@ -441,4 +451,11 @@ final class InquiryDb
             return [];
         }
     }
+}
+
+if (
+    class_exists(\Lumora\Core\InquiryDb::class, false)
+    && !class_exists(\Astrake\Lumora\Core\InquiryDb::class, false)
+) {
+    class_alias(\Lumora\Core\InquiryDb::class, \Astrake\Lumora\Core\InquiryDb::class);
 }

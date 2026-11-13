@@ -95,7 +95,7 @@ component('layout/header', ['config' => $config ?? []]);
 
             <div class="form-field" style="flex-direction:row;align-items:center;gap:0.5rem;">
                 <input type="checkbox" id="consent" name="consent" value="1" required />
-                <label for="consent">I acknowledge the <a href="<?= e(u('/legal/privacy/')) ?>">Privacy Notice (DPDP Act 2023)</a>. *</label>
+                <label for="consent">I acknowledge the <a href="<?= e(u('/legal/privacy/')) ?>">Privacy Policy</a>. *</label>
             </div>
 
             <button type="submit" class="btn-primary"><?= e($metaInfo['button_text'] ?? 'Send Inquiry') ?></button>

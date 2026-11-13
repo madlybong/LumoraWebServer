@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Astrake\Lumora\Core {
+namespace Lumora\Core {
 
 if (!defined('LUMORA_BOOTSTRAPPED')) {
     http_response_code(403);
@@ -120,7 +120,7 @@ final class Render
 
         $brandName = (string)($brand['name'] ?? 'Lumora Website');
         $origin = rtrim((string)($brand['origin'] ?? 'https://localhost'), '/');
-        $locale = (string)($brand['locale'] ?? 'en-IN');
+        $locale = (string)($brand['locale'] ?? 'en');
         $ogLocale = str_replace('-', '_', $locale);
         $themeColor = (string)($brand['theme_color'] ?? '#0a0a0a');
         $colorScheme = (string)($brand['color_scheme'] ?? 'light');
@@ -156,9 +156,19 @@ final class Render
             "<link rel=\"canonical\" href=\"{$eCanonical}\" />",
             "<link rel=\"alternate\" hreflang=\"{$eHreflang}\" href=\"{$eCanonical}\" />",
             "<link rel=\"alternate\" hreflang=\"x-default\" href=\"{$eCanonical}\" />",
-            "<link rel=\"alternate\" type=\"text/plain\" title=\"AI Context Manifest\" href=\"{$origin}/llms.txt\" />",
-            "<link rel=\"alternate\" type=\"text/plain\" title=\"AI Full Knowledge Specification\" href=\"{$origin}/llms-full.txt\" />",
-            "<link rel=\"manifest\" href=\"" . self::escape(self::assetUrl('/site.webmanifest')) . "\" />",
+        ];
+
+        $rootForDisc = self::$rootDir !== '' ? self::$rootDir : (string)($GLOBALS['lumoraRootDir'] ?? '');
+        if (Discovery::isEndpointEnabled('llms_txt', $config, $rootForDisc)) {
+            $lines[] = "<link rel=\"alternate\" type=\"text/plain\" title=\"AI Context Manifest\" href=\"{$origin}/llms.txt\" />";
+            $lines[] = "<link rel=\"alternate\" type=\"text/plain\" title=\"AI Full Knowledge Specification\" href=\"{$origin}/llms-full.txt\" />";
+        }
+        if (Discovery::isEndpointEnabled('webmanifest', $config, $rootForDisc)) {
+            $lines[] = "<link rel=\"manifest\" href=\"" . self::escape(self::assetUrl('/site.webmanifest')) . "\" />";
+        }
+
+        array_push(
+            $lines,
             "<meta property=\"og:site_name\" content=\"{$eBrand}\" />",
             "<meta property=\"og:locale\" content=\"{$eOgLocale}\" />",
             "<meta property=\"og:type\" content=\"{$eOgType}\" />",
@@ -169,8 +179,8 @@ final class Render
             "<meta name=\"twitter:card\" content=\"summary_large_image\" />",
             "<meta name=\"twitter:title\" content=\"{$eTitle}\" />",
             "<meta name=\"twitter:description\" content=\"{$eDesc}\" />",
-            "<meta name=\"twitter:image\" content=\"{$eOgImage}\" />",
-        ];
+            "<meta name=\"twitter:image\" content=\"{$eOgImage}\" />"
+        );
 
         // Preload self-hosted WOFF2 fonts with SHA-384 SRI
         $fonts = is_array($assets['fonts'] ?? null) ? $assets['fonts'] : [];
@@ -228,7 +238,14 @@ final class Render
 }
 
 namespace {
-    use Astrake\Lumora\Core\Render;
+    if (
+        class_exists(\Lumora\Core\Render::class, false)
+        && !class_exists(\Astrake\Lumora\Core\Render::class, false)
+    ) {
+        class_alias(\Lumora\Core\Render::class, \Astrake\Lumora\Core\Render::class);
+    }
+
+    use Lumora\Core\Render;
 
     if (!function_exists('e')) {
         function e(?string $value): string

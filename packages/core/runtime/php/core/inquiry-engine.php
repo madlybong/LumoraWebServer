@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Astrake\Lumora\Core {
+namespace Lumora\Core {
 
 if (!defined('LUMORA_BOOTSTRAPPED')) {
     http_response_code(403);
@@ -20,47 +20,18 @@ final class InquiryEngine
         $defaults = [
             'default_channel' => 'general',
             'honeypot_mode'   => 'reject', // 'reject' | 'fake_receipt'
-            'aliases'         => [
-                'data-rights' => 'privacy',
-                'dpdp'        => 'privacy',
-                'gdpr'        => 'privacy',
-            ],
-            'referer_map'     => [
-                '/legal/security' => 'security',
-                '/legal/privacy'  => 'privacy',
-            ],
+            'aliases'         => [],
+            'referer_map'     => [],
             'channels'        => [
                 'general'  => [
                     'code'                => 'CHN-01',
-                    'label'               => 'Business & Project Inquiry',
+                    'label'               => 'General Inquiry',
                     'heading'             => 'Send Us a Message',
                     'sla'                 => '1-2 Business Days',
-                    'subject_placeholder' => 'e.g. Architecture Consultation or Project Scoping',
+                    'subject_placeholder' => 'e.g. Project Inquiry or Support Question',
                     'message_label'       => 'How Can We Help? *',
                     'message_placeholder' => 'Describe your requirements, timeline, or questions...',
                     'button_text'         => 'Send Inquiry',
-                    'fields'              => [],
-                ],
-                'security' => [
-                    'code'                => 'CHN-02',
-                    'label'               => 'Security Vulnerability Report',
-                    'heading'             => 'Report a Security Issue',
-                    'sla'                 => '24 Hours (CERT-In Mandate)',
-                    'subject_placeholder' => 'Brief summary of the security finding',
-                    'message_label'       => 'Vulnerability Details & Steps to Reproduce *',
-                    'message_placeholder' => 'Describe the affected URL or component and steps to reproduce...',
-                    'button_text'         => 'Submit Security Report',
-                    'fields'              => [],
-                ],
-                'privacy'  => [
-                    'code'                => 'CHN-03',
-                    'label'               => 'Data Privacy & Statutory Rights',
-                    'heading'             => 'Data Principal Rights & Grievance Redressal',
-                    'sla'                 => '72 Hours',
-                    'subject_placeholder' => 'e.g. Data Access, Correction, Erasure, or Grievance',
-                    'message_label'       => 'Request Description & Reference *',
-                    'message_placeholder' => 'Describe your statutory data rights request and any prior receipt ID...',
-                    'button_text'         => 'Submit Privacy Request',
                     'fields'              => [],
                 ],
             ],
@@ -79,8 +50,8 @@ final class InquiryEngine
             return [
                 'default_channel' => (string)($loaded['default_channel'] ?? $defaults['default_channel']),
                 'honeypot_mode'   => (string)($loaded['honeypot_mode'] ?? $defaults['honeypot_mode']),
-                'aliases'         => array_merge($defaults['aliases'], is_array($loaded['aliases'] ?? null) ? $loaded['aliases'] : []),
-                'referer_map'     => array_merge($defaults['referer_map'], is_array($loaded['referer_map'] ?? null) ? $loaded['referer_map'] : []),
+                'aliases'         => is_array($loaded['aliases'] ?? null) ? $loaded['aliases'] : [],
+                'referer_map'     => is_array($loaded['referer_map'] ?? null) ? $loaded['referer_map'] : [],
                 'channels'        => $loaded['channels'],
             ];
         }
@@ -389,14 +360,13 @@ final class InquiryEngine
             $fieldErrors['message'] = $msg;
         }
 
-        // Consent verification ('consent' or 'dpdp_consent', unless channel disables explicit checkbox)
+        // Consent verification ('consent' primary, optional legacy alias fallback)
         $requireConsent = (bool)($channelMeta['require_consent'] ?? true);
         $consentGiven = !empty($post['consent']) || !empty($post['dpdp_consent']);
         if ($requireConsent && !$consentGiven) {
-            $msg = 'Please confirm the privacy policy acknowledgment before submitting.';
+            $msg = 'Please confirm the consent acknowledgment before submitting.';
             $errors[] = $msg;
             $fieldErrors['consent'] = $msg;
-            $fieldErrors['dpdp_consent'] = $msg;
         }
 
         $submittedData = array_merge($post, [
@@ -431,6 +401,21 @@ final class InquiryEngine
             ];
         }
 
+        // Extract optional first-party attribution payload (_attr_* or direct UTM/CTA parameters)
+        $attribution = [];
+        foreach (['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'landing_page', 'referrer', 'cta_id'] as $attrKey) {
+            $rawAttr = $post['_attr_' . $attrKey] ?? $post[$attrKey] ?? '';
+            if (is_scalar($rawAttr)) {
+                $cleanAttr = mb_substr(trim(strip_tags(str_replace(["\r", "\n"], ' ', (string)$rawAttr))), 0, 120);
+                if ($cleanAttr !== '') {
+                    $attribution[$attrKey] = $cleanAttr;
+                }
+            }
+        }
+        if (!empty($attribution)) {
+            $receiptDetails['_attribution'] = $attribution;
+        }
+
         // 7. Generate Receipt ID, Persist to SQLite WAL + JSONL, Dispatch Notifications & Optional Hub Sync
         $prefix = strtoupper((string)($cfg['brand']['prefix'] ?? 'LUM'));
         $receiptId = $prefix . '-' . gmdate('Ymd', $now) . '-' . strtoupper(bin2hex(random_bytes(2)));
@@ -459,6 +444,9 @@ final class InquiryEngine
             'sync_status'       => 'pending',
             'created_at'        => $isoCreated,
         ];
+        if (!empty($attribution)) {
+            $record['attribution'] = $attribution;
+        }
 
         $dbId = InquiryDb::saveSubmission($record, $cfg, $resolvedRoot);
 
@@ -485,7 +473,7 @@ final class InquiryEngine
             if (!headers_sent()) {
                 http_response_code(503);
             }
-            $contactEmail = (string)($cfg['brand']['contact_email'] ?? ('office@' . ($cfg['brand']['domain'] ?? 'localhost')));
+            $contactEmail = (string)($cfg['brand']['contact_email'] ?? ('contact@' . ($cfg['brand']['domain'] ?? 'localhost')));
             $failMsg = "We could not save your message right now due to a temporary storage error. Please try again or email {$contactEmail}.";
             return [
                 'submitted'    => true,
@@ -527,6 +515,7 @@ final class InquiryEngine
             'email'           => $email,
             'return_contact'  => $email . ($phone !== '' ? ' / ' . $phone : ''),
             'details'         => $receiptDetails,
+            'attribution'     => $attribution,
             'email_status'    => $emailStatus,
             'whatsapp_status' => $waStatus,
             'sync_status'     => $syncStatus,
@@ -541,7 +530,14 @@ final class InquiryEngine
 }
 
 namespace {
-    use Astrake\Lumora\Core\InquiryEngine;
+    if (
+        class_exists(\Lumora\Core\InquiryEngine::class, false)
+        && !class_exists(\Astrake\Lumora\Core\InquiryEngine::class, false)
+    ) {
+        class_alias(\Lumora\Core\InquiryEngine::class, \Astrake\Lumora\Core\InquiryEngine::class);
+    }
+
+    use Lumora\Core\InquiryEngine;
 
     if (!function_exists('lumora_handle_inquiry')) {
         function lumora_handle_inquiry(?array $postInput = null): array
