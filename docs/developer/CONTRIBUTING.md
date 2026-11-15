@@ -22,12 +22,14 @@ bun run validate
 
 | Directory | Package / Purpose |
 | :--- | :--- |
-| `packages/core/runtime/php/core/` | The 13 headless PHP 8.2+ runtime classes (`Lumora\Core`, with legacy `Astrake\Lumora\Core` alias). |
+| `packages/core/runtime/php/core/` | The 17 headless PHP 8.2+ runtime classes (`Lumora\Core`, with legacy `Astrake\Lumora\Core` alias). |
 | `packages/core/runtime/php/stubs/` | Canonical root stubs (`index.stub.php`, `router.stub.php`, `htaccess.stub.conf`, `nginx.stub.conf`). |
+| `packages/core/runtime/admin/` | Prebuilt AOT Vue 3 + `reka-ui` + CodeMirror 6 Admin Console bundle (`lumora-admin.js`, `lumora-admin.css`). |
 | `packages/core/runtime/css/` | `lumora-base.css` (Tailwind CSS v4 entry + `@theme` structural primitives + accessibility rules). |
-| `packages/core/runtime/js/` | `lumora-core.js` (Client ES module for motion tiering, mobile navigation, and form validation). |
+| `packages/core/runtime/js/` | `lumora-core.js` (Client ES module for motion tiering, mobile navigation, attribution, and form validation). |
 | `packages/core/src/types/` | Zod schemas (`LumoraWebConfigSchema`, `LumoraInquiryWirePayloadSchema`) and HMAC signature helpers. |
-| `packages/core/src/cli/` | TypeScript implementation of `lumora-web` commands (`init`, `sync`, `css`, `dev`, `build`, `verify`, `flush`). |
+| `packages/core/src/cli/` | TypeScript implementation of `lumora-web` commands (`init`, `sync`, `css`, `dev`, `build`, `verify`, `flush`, `admin`). |
+| `packages/admin/` | Source Vue 3 + TypeScript + CodeMirror 6 Admin Console workspace compiled into `packages/core/runtime/admin/`. |
 | `apps/starter/` | Dogfooding reference website (`lumora-web-starter`) exercising all framework features and all 12 compliance gates. |
 | `tools/` | Workspace automation (`build.ts`, `check.ts`, `version.ts`, `changelog.ts`, `validate.ts`). |
 

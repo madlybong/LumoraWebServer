@@ -1,0 +1,36 @@
+{
+  "name": "@astrake/lumora-admin",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && bun run check",
+    "check": "vue-tsc --noEmit || tsc --noEmit"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.18.0",
+    "@codemirror/commands": "^6.7.0",
+    "@codemirror/lang-html": "^6.4.9",
+    "@codemirror/lang-markdown": "^6.3.1",
+    "@codemirror/language": "^6.10.0",
+    "@codemirror/search": "^6.5.8",
+    "@codemirror/state": "^6.5.0",
+    "@codemirror/view": "^6.35.0",
+    "@lezer/highlight": "^1.2.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "codemirror": "^6.0.1",
+    "lucide-vue-next": "^0.511.0",
+    "reka-ui": "^2.2.1",
+    "tailwind-merge": "^3.2.0",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.4",
+    "@vitejs/plugin-vue": "^5.2.3",
+    "tailwindcss": "^4.1.4",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.0"
+  }
+}

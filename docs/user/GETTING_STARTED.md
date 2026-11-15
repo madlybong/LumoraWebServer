@@ -31,25 +31,28 @@ bunx lumora-web init \
 ### What `lumora-web init` Creates
 - `lumora.config.php`: Pre-populated brand identity, security, discovery, asset, Hub, legal (`GLOBAL`, `['privacy', 'terms']`), and feature flags.
 - `index.php`, `router.php`, `.htaccess`: Canonical front controller, local `php -S` dev router, and Apache/cPanel security rules.
-- `core/*.php`: All 13 headless PHP 8.2+ runtime modules (`Lumora\Core`, with legacy `Astrake\Lumora\Core` alias).
+- `core/*.php`: All 17 headless PHP 8.2+ runtime modules (`Lumora\Core`, with legacy `Astrake\Lumora\Core` alias).
 - `lumora-lock.json`: Cryptographic SHA-256 core checksums and SHA-384 asset SRI hashes.
 - `css/brand-theme.css` & `css/brand.css`: Brand design tokens and component styles compiled into `public/assets/css/lumora.min.css`.
 - `content/routes.php`, `content/channels.php`, `content/legal/{privacy,terms}.php`: Initial route table, single `'general'` inquiry channel definition, and customizable legal starters.
 - `templates/`: Starter templates (`layout/head.php`, `layout/header.php`, `layout/footer.php`, `home.php`, `contact.php`, `legal.php`, `404.php`).
 - `package.json`, `.gitignore`, `AGENTS.md`, `.cursorrules`, and `LUMORA_SETUP.md`: Non-destructively merges standard `lumora-web` scripts (`sync`, `css`, `dev`, `build`, `verify`, `flush`), ignore rules, and AI coding rules.
 
-### Refactoring an Existing Website Project
-To refactor an existing website repository in-place without clobbering existing brand templates or routes:
+### Refactoring or Upgrading an Existing Website Project
+To refactor an existing website repository in-place (without clobbering existing brand templates or routes) or upgrade an existing `0.1.x` site to `0.2.0` with the opt-in Admin Console:
 
 ```bash
 cd /path/to/existing-website
-bun add -D @astrake/lumora-webserver
-bunx lumora-web init --with-agents --brand-id "my-site" --brand-name "My Site" --prefix "MYS" --domain "my-site.example.com"
-bunx lumora-web sync --force-stubs --with-agents
+bun add -D @astrake/lumora-webserver@^0.2.0
+bunx lumora-web init --with-agents --with-admin --brand-id "my-site" --brand-name "My Site" --prefix "MYS" --domain "my-site.example.com"
+# Or for an already-initialized 0.1.x site upgrading to 0.2.0:
+bunx lumora-web sync --with-admin --force-stubs --with-agents
 bunx lumora-web css
 bunx lumora-web build
 bunx lumora-web verify
 ```
+
+See [Upgrading Existing Websites (`UPGRADING.md`)](./UPGRADING.md) for the complete step-by-step & AI-agent upgrade playbook.
 
 ---
 

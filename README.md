@@ -28,12 +28,27 @@ bunx lumora-web build
 bunx lumora-web verify
 ```
 
+### Upgrading Existing Websites (`0.1.x` → `0.2.0`)
+
+```bash
+bun add -D @astrake/lumora-webserver@^0.2.0
+# Core-only upgrade (admin panel stays disabled):
+bunx lumora-web sync --force-stubs --with-agents
+# OR enable the new Admin Console & Hybrid SQLite CMS in-place:
+bunx lumora-web sync --with-admin --force-stubs --with-agents
+
+bunx lumora-web css && bunx lumora-web build && bunx lumora-web verify
+```
+
+See [**Upgrading Existing Websites (`docs/user/UPGRADING.md`)**](./docs/user/UPGRADING.md) for the full agentic upgrade playbook.
+
 ---
 
 ## 2. Documentation Index
 
 ### User & Site Operator Guides
 - [**Getting Started (`docs/user/GETTING_STARTED.md`)**](./docs/user/GETTING_STARTED.md): Scaffolding a project, authoring templates and components, adding docs/blog content, and running the CLI.
+- [**Upgrading Existing Websites (`docs/user/UPGRADING.md`)**](./docs/user/UPGRADING.md): Upgrading from `0.1.x` to `0.2.0`, enabling `--with-admin`, Hybrid SQLite CMS precedence, and copy-pasteable AI coding agent upgrade prompts.
 - [**Configuration Reference (`docs/user/CONFIGURATION.md`)**](./docs/user/CONFIGURATION.md): Complete schema reference for `lumora.config.php`, `content/routes.php`, `content/channels.php`, `content/legal/{slug}.php`, and environment variables.
 - [**Production Deployment (`docs/user/DEPLOYMENT.md`)**](./docs/user/DEPLOYMENT.md): Deploying `dist/` to Apache/cPanel/LiteSpeed, Nginx/aaPanel, Cloudflare/reverse proxies, and configuring Edge SMTP/WhatsApp or Central Hub sync.
 
@@ -60,17 +75,20 @@ bunx lumora-web verify
    - **App-Driven Legal Registry (`legal-registry.php`):** Globally neutral defaults (`'GLOBAL'`, `['privacy', 'terms']`) with opt-in regional compliance templates (`IN`, `EU`, `UK`, `US`), custom `content/legal/{slug}.php` documents, configurable `legal.slugs`, and `features.legal_registry = false` toggle.
    - **Content & Release Engines (`docs-engine.php`, `blog-engine.php`, `release-server.php`):** Manifest-jailed Markdown documentation engine (with `dist/` manifest inlining), file-based blog engine with localhost draft gating and Atom 1.0 feed, and RFC 9110 `Range` (`206 Partial Content`) binary artifact server with `X-Checksum-Sha256`.
 
+   - **Opt-In Admin Console & Hybrid SQLite CMS (`admin-db.php`, `admin-auth.php`, `admin-sanitizer.php`, `admin-controller.php`, `packages/admin`):** Opt-in (`features.admin_panel`) Vue 3 + `shadcn-vue` (`reka-ui`) + `lucide-vue-next` SPA with Argon2id auth, RFC 6238 TOTP 2FA, RBAC (`owner`/`editor`/`viewer`), OpenSSL `aes-256-gcm` settings vault, zero-write public GET fast-path (`AdminDb::connectExisting()`), stealth `admin.path` + minimal `admin.branding`, and `lumora-web admin` CLI.
+
 2. **Tailwind CSS v4 + Brand Design Layer (`runtime/css/lumora-base.css`):**
    - Compiles `lumora-base.css` + `css/brand-theme.css` + `css/brand.css` into an SRI-locked stylesheet (`public/assets/css/lumora.min.css`).
 
 3. **Zero-Dependency `dist/` Packaging & 12-Gate Verifier (`lumora-web` CLI):**
-   - `lumora-web init`: Scaffolds a new website project.
-   - `lumora-web sync`: Syncs the locked PHP/JS runtime and computes SHA-256 + SHA-384 SRI hashes in `lumora-lock.json`.
+   - `lumora-web init`: Scaffolds a new website project (`--with-admin` enables the opt-in Admin Console & Hybrid SQLite CMS).
+   - `lumora-web sync`: Syncs the locked 17-module PHP/JS/admin runtime and computes SHA-256 + SHA-384 SRI hashes in `lumora-lock.json` (`--force-stubs`, `--with-agents`, `--with-admin`).
    - `lumora-web css`: Compiles Tailwind v4 + brand CSS layers.
    - `lumora-web dev`: Runs `php -S` dev server with live CSS/SRI watcher.
    - `lumora-web build`: Produces a 100% standalone `dist/` bundle with physical `<route>/index.php` stubs, `.htaccess`, and `nginx.lumora.conf`.
    - `lumora-web verify`: Runs all 12 compliance gates (source, SQLite WAL smoke, live HTTP headers, and zero-rewrite `dist/` server).
    - `lumora-web flush`: Replays pending SQLite WAL outbox inquiries to a configured webhook/hub endpoint.
+   - `lumora-web admin`: Manages admin users, passwords, 2FA, and active sessions in the site's SQLite vault (`create-user`, `list-users`, `reset-password`, `disable-2fa`, `revoke-sessions`, `hash-password`).
 
 ---
 

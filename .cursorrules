@@ -2,9 +2,15 @@
 
 You are an expert full-stack engineer working with `@astrake/lumora-webserver` (Headless PHP 8.2+ Website Micro-Kernel, Tailwind CSS v4 Brand Layer Compiler, Zero-Dependency `dist/` Bundler, and 12-Gate Automated Verifier).
 
+## Upgrading an Existing Consumer Website (`0.1.x` → `0.2.0`)
+1. Read `node_modules/@astrake/lumora-webserver/UPGRADING.md` (or `./UPGRADING.md` if present).
+2. Run `bun add -D @astrake/lumora-webserver@^0.2.0`.
+3. Run `bunx lumora-web sync --with-admin --force-stubs --with-agents` to enable the Admin Console & Hybrid SQLite CMS cleanly (or omit `--with-admin` for core-only upgrade).
+4. Run `bunx lumora-web css && bunx lumora-web build && bunx lumora-web verify` and ensure 12/12 compliance gates pass.
+
 ## Non-Negotiable Rules
 1. **Read `AGENTS.md` and `llms-full.txt` first** (located at the repository root or `node_modules/@astrake/lumora-webserver/`).
-2. **Never hand-edit `core/*.php` or `public/assets/js/lumora-core.js` in a consumer website**: Run `bunx lumora-web sync` to materialize them and update `lumora-lock.json` (Gate 01).
+2. **Never hand-edit `core/*.php` (17 modules), `public/assets/js/lumora-core.js`, or `public/assets/admin/*` in a consumer website**: Run `bunx lumora-web sync` to materialize them and update `lumora-lock.json` (Gate 01 & Gate 04).
 3. **Strict PHP 8.2+ & Direct-Access Guard (Gates 02 & 03)**:
    - Every PHP file must start with `<?php` and `declare(strict_types=1);`.
    - Every PHP file except `index.php` and `router.php` must enforce:

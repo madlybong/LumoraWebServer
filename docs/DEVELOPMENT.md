@@ -64,9 +64,10 @@ bun run release:prep
 
 ## Repo Conventions
 
-- **Bun workspace** with two active projects:
-  - `packages/core`: Published `@astrake/lumora-webserver` npm package (TypeScript CLI/verifier + PHP 8.2+ runtime + shared client ES module + base CSS).
-  - `apps/starter`: Reference enterprise brand website dogfooding all 16 PHP core modules and verified against all 12 Compliance Gates.
+- **Bun workspace** with three active projects:
+  - `packages/core`: Published `@astrake/lumora-webserver` npm package (TypeScript CLI/verifier + 17-module PHP 8.2+ runtime + prebuilt Admin Console runtime + shared client ES module + base CSS).
+  - `packages/admin`: Source Vue 3 + `reka-ui` + CodeMirror 6 + `lucide-vue-next` Admin Console SPA built AOT into `packages/core/runtime/admin/`.
+  - `apps/starter`: Reference enterprise brand website dogfooding all 17 PHP core modules and verified against all 12 Compliance Gates.
 - Root `tools/` scripts orchestrate typechecking, building, version synchronization, changelog generation, and the unified validation pipeline.
 
 ## Verification Rule

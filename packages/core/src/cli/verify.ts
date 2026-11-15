@@ -8,7 +8,9 @@ import {
   loadPhpLegalSlugs,
   loadPhpSiteConfig,
   loadPhpSiteRoutes,
+  normalizeAdminPathTs,
   sha256File,
+  sriSha384Buffer,
   sriSha384File,
   toPosixPath,
 } from "./paths";
@@ -98,6 +100,24 @@ function collectFiles(dir: string, extFilter?: (filePath: string) => boolean): s
   return results;
 }
 
+function isAdminPanelEnabled(siteRoot: string): { enabled: boolean; adminPath: string } {
+  if (!existsSync(path.join(siteRoot, "lumora.config.php"))) {
+    return { enabled: false, adminPath: "/admin/" };
+  }
+  try {
+    const cfg = loadPhpSiteConfig(siteRoot) as {
+      features?: { admin_panel?: boolean };
+      admin?: { path?: string };
+    };
+    return {
+      enabled: Boolean(cfg.features?.admin_panel),
+      adminPath: normalizeAdminPathTs(cfg.admin?.path),
+    };
+  } catch {
+    return { enabled: false, adminPath: "/admin/" };
+  }
+}
+
 /**
  * Gate 01 — Core Lock Integrity
  */
@@ -138,6 +158,19 @@ function runGate01CoreLockIntegrity(siteRoot: string): GateResult {
       details.push(`SHA-256 mismatch on ${relPath}`);
       driftCount++;
     }
+  }
+
+  const { enabled: adminEnabled } = isAdminPanelEnabled(siteRoot);
+  if (adminEnabled) {
+    for (const rel of ["/public/assets/admin/lumora-admin.js", "/public/assets/admin/lumora-admin.css"]) {
+      if (!expectedMap[rel]) {
+        details.push(`Missing admin asset entry in lumora-lock.json core_sha256: ${rel}`);
+        driftCount++;
+      }
+    }
+  } else if (existsSync(path.join(siteRoot, "public", "assets", "admin"))) {
+    details.push("Unexpected public/assets/admin/ directory present while features.admin_panel is disabled.");
+    driftCount++;
   }
 
   // Also ensure no untracked extra PHP files were added inside core/
@@ -292,6 +325,11 @@ function runGate04AssetSriSynchronization(siteRoot: string): GateResult {
   assetsToVerify.add("/public/assets/css/lumora.min.css");
   assetsToVerify.add("/public/assets/js/lumora-core.js");
 
+  if (isAdminPanelEnabled(siteRoot).enabled) {
+    assetsToVerify.add("/public/assets/admin/lumora-admin.css");
+    assetsToVerify.add("/public/assets/admin/lumora-admin.js");
+  }
+
   const fontsDir = path.join(siteRoot, "public", "fonts");
   if (existsSync(fontsDir)) {
     for (const f of readdirSync(fontsDir)) {
@@ -391,6 +429,24 @@ function runGate06DesignTokenAndA11yAudit(siteRoot: string): GateResult {
     if (!cssText.includes(":focus-visible")) {
       details.push("Compiled stylesheet is missing :focus-visible keyboard focus ring rule.");
       issues++;
+    }
+  }
+
+  if (isAdminPanelEnabled(siteRoot).enabled) {
+    const adminCssPath = path.join(siteRoot, "public", "assets", "admin", "lumora-admin.css");
+    if (!existsSync(adminCssPath) || statSync(adminCssPath).size < 100) {
+      details.push("Admin stylesheet public/assets/admin/lumora-admin.css is missing or empty.");
+      issues++;
+    } else {
+      const adminCssText = readFileSync(adminCssPath, "utf8");
+      if (!adminCssText.includes("prefers-reduced-motion")) {
+        details.push("Admin stylesheet is missing prefers-reduced-motion accessibility rules.");
+        issues++;
+      }
+      if (!adminCssText.includes(":focus-visible")) {
+        details.push("Admin stylesheet is missing :focus-visible keyboard focus ring rule.");
+        issues++;
+      }
     }
   }
 
@@ -668,6 +724,18 @@ function runGate09InquiryEngineAndSqliteWalSmoke(siteRoot: string): GateResult {
     $sqliteExists = is_file($vaultDir . '/lumora.sqlite');
     $jsonlExists = is_file($vaultDir . '/contacts-backup.jsonl');
 
+    $adminSmokeOk = true;
+    if (!empty($cfg['features']['admin_panel'])) {
+      $adminPdo = \\Lumora\\Core\\AdminDb::connect(${JSON.stringify(tempRootPosix)});
+      $adminCreate = $adminPdo ? \\Lumora\\Core\\AdminAuth::createUser($adminPdo, 'smoke-owner@example.com', 'Smoke Owner', 'owner', 'SmokeTestPass!2026', ${JSON.stringify(tempRootPosix)}) : ['ok' => false];
+      $adminLogin = $adminPdo ? \\Lumora\\Core\\AdminAuth::login($adminPdo, $cfg, ${JSON.stringify(tempRootPosix)}, 'smoke-owner@example.com', 'SmokeTestPass!2026') : ['ok' => false];
+      $totpSecret = \\Lumora\\Core\\AdminAuth::generateTotpSecret();
+      $totpCode = \\Lumora\\Core\\AdminAuth::hotp(\\Lumora\\Core\\AdminAuth::base32Decode($totpSecret), intdiv($now, 30));
+      $totpRes = \\Lumora\\Core\\AdminAuth::verifyTotpCode($totpSecret, $totpCode, 0, $now);
+      $adminSmokeOk = !empty($adminCreate['ok']) && !empty($adminLogin['authenticated']) && !empty($totpRes['ok']);
+    }
+
+    \\Lumora\\Core\\AdminDb::resetMigrationCache();
     \\Lumora\\Core\\InquiryDb::resetConnection();
 
     echo json_encode([
@@ -680,6 +748,7 @@ function runGate09InquiryEngineAndSqliteWalSmoke(siteRoot: string): GateResult {
       'rate_limited_6th' => ($rateLimitRes['success'] === false && str_contains(implode(' ', $rateLimitRes['errors'] ?? []), 'rate limit')),
       'sqlite_exists' => $sqliteExists,
       'jsonl_exists' => $jsonlExists,
+      'admin_smoke_ok' => $adminSmokeOk,
       'elapsed_ms' => round($elapsedMs, 2),
     ]);
   `;
@@ -695,6 +764,7 @@ function runGate09InquiryEngineAndSqliteWalSmoke(siteRoot: string): GateResult {
       rate_limited_6th: boolean;
       sqlite_exists: boolean;
       jsonl_exists: boolean;
+      admin_smoke_ok: boolean;
       elapsed_ms: number;
     }>(script, siteRoot);
 
@@ -706,7 +776,8 @@ function runGate09InquiryEngineAndSqliteWalSmoke(siteRoot: string): GateResult {
       res.hub_sig_valid &&
       res.rate_limited_6th &&
       res.sqlite_exists &&
-      res.jsonl_exists;
+      res.jsonl_exists &&
+      res.admin_smoke_ok;
 
     if (passed) {
       details.push(
@@ -787,9 +858,41 @@ async function runGate10LiveHttpSecurityHeaderAudit(siteRoot: string): Promise<G
 
     let failures = 0;
     const homeRes = await fetch(`${baseUrl}/`, { redirect: "manual" });
+    const homeBody = await homeRes.text();
     if (homeRes.status !== 200) {
       details.push(`GET / returned ${homeRes.status} (expected 200)`);
       failures++;
+    }
+    if (
+      !homeBody.includes("<!DOCTYPE html>") ||
+      !homeBody.includes("<head") ||
+      homeBody.includes("Fatal error:") ||
+      homeBody.includes("TypeError") ||
+      homeBody.includes('href="\\/') ||
+      homeBody.includes('src="\\/') ||
+      homeBody.includes('"\\/')
+    ) {
+      details.push("GET / rendered malformed HTML, PHP error output, or escaped Windows backslash paths.");
+      failures++;
+    }
+
+    const cssTag = homeBody.match(/<link\b[^>]*rel=["']stylesheet["'][^>]*>/i)?.[0] ?? "";
+    const cssHref = cssTag.match(/\bhref=["']([^"']+)["']/i)?.[1] ?? "";
+    const expectedCssSri = cssTag.match(/\bintegrity=["'](sha384-[^"']+)["']/i)?.[1] ?? "";
+    if (!cssTag || !cssHref || !expectedCssSri) {
+      details.push('GET / missing <link rel="stylesheet" ... integrity="sha384-..."> element.');
+      failures++;
+    } else {
+      const cssUrl = cssHref.startsWith("http") ? cssHref : `${baseUrl}${cssHref.startsWith("/") ? "" : "/"}${cssHref}`;
+      const cssRes = await fetch(cssUrl, { redirect: "manual" });
+      const cssBytes = Buffer.from(await cssRes.arrayBuffer());
+      if (cssRes.status !== 200) {
+        details.push(`Stylesheet ${cssHref} returned ${cssRes.status} (expected 200)`);
+        failures++;
+      } else if (sriSha384Buffer(cssBytes) !== expectedCssSri) {
+        details.push(`Stylesheet ${cssHref} SHA-384 SRI mismatch against HTML integrity attribute.`);
+        failures++;
+      }
     }
 
     const requiredHeaders = [
@@ -820,6 +923,8 @@ async function runGate10LiveHttpSecurityHeaderAudit(siteRoot: string): Promise<G
 
     const siteConfig = loadPhpSiteConfig(siteRoot) as {
       brand?: { security_email?: string };
+      features?: { admin_panel?: boolean; blog_engine?: boolean; release_server?: boolean };
+      admin?: { path?: string };
       discovery?: {
         health?: boolean;
         robots_txt?: boolean;
@@ -847,12 +952,99 @@ async function runGate10LiveHttpSecurityHeaderAudit(siteRoot: string): Promise<G
     ];
 
     let checkedDiscovery = 0;
+    let robotsBody = "";
     for (const item of discoveryPaths) {
       if (!item.enabled) continue;
       checkedDiscovery++;
       const res = await fetch(`${baseUrl}${item.path}`, { redirect: "manual" });
       if (res.status !== 200) {
         details.push(`Expected 200 OK on discovery endpoint ${item.path}, got ${res.status}`);
+        failures++;
+      } else if (item.path === "/robots.txt") {
+        robotsBody = await res.text();
+      }
+    }
+
+    if (siteConfig.features?.blog_engine) {
+      const feedRes = await fetch(`${baseUrl}/blog/feed.xml`, { redirect: "manual" });
+      const feedBody = await feedRes.text();
+      if (feedRes.status !== 200 || !feedBody.includes("<feed")) {
+        details.push(`Expected 200 Atom XML on /blog/feed.xml, got ${feedRes.status}`);
+        failures++;
+      }
+    }
+
+    if (siteConfig.features?.release_server) {
+      const manifestRes = await fetch(`${baseUrl}/releases/release-manifest.json`, { redirect: "manual" });
+      const manifestBody = await manifestRes.text();
+      if (manifestRes.status !== 200) {
+        details.push(`Expected 200 OK on /releases/release-manifest.json, got ${manifestRes.status}`);
+        failures++;
+      } else {
+        try {
+          JSON.parse(manifestBody);
+        } catch {
+          details.push("/releases/release-manifest.json returned invalid JSON");
+          failures++;
+        }
+      }
+
+      const sumsRes = await fetch(`${baseUrl}/releases/SHA256SUMS`, { redirect: "manual" });
+      if (sumsRes.status !== 200) {
+        details.push(`Expected 200 OK on /releases/SHA256SUMS, got ${sumsRes.status}`);
+        failures++;
+      }
+    }
+
+    if (siteConfig.features?.admin_panel) {
+      const adminPath = normalizeAdminPathTs(siteConfig.admin?.path);
+      const nonSlashedAdmin = adminPath.slice(0, -1);
+      const adminRedirRes = await fetch(`${baseUrl}${nonSlashedAdmin}`, { redirect: "manual" });
+      const adminLocation = adminRedirRes.headers.get("location") ?? "";
+      if (
+        (adminRedirRes.status !== 301 && adminRedirRes.status !== 302) ||
+        !adminLocation.startsWith("/") ||
+        adminLocation.startsWith("//") ||
+        adminLocation.includes("\\")
+      ) {
+        details.push(
+          `GET ${nonSlashedAdmin} redirect failed (status=${adminRedirRes.status}, location=${adminLocation})`
+        );
+        failures++;
+      }
+
+      const adminShellRes = await fetch(`${baseUrl}${adminPath}`, { redirect: "manual" });
+      const adminShellBody = await adminShellRes.text();
+      if (adminShellRes.status !== 200) {
+        details.push(`GET ${adminPath} returned ${adminShellRes.status} (expected 200)`);
+        failures++;
+      }
+      const xRobots = adminShellRes.headers.get("x-robots-tag") ?? "";
+      if (!xRobots.toLowerCase().includes("noindex")) {
+        details.push(`GET ${adminPath} missing X-Robots-Tag noindex header`);
+        failures++;
+      }
+      if (!adminShellRes.headers.get("content-security-policy")) {
+        details.push(`GET ${adminPath} missing Content-Security-Policy header`);
+        failures++;
+      }
+      if (!adminShellBody.includes('id="lumora-admin-app"') || !adminShellBody.includes('integrity="sha384-')) {
+        details.push(`GET ${adminPath} shell HTML missing #lumora-admin-app or SHA-384 SRI integrity attributes`);
+        failures++;
+      }
+      if (adminShellBody.includes("Fatal error:") || adminShellBody.includes("\\/")) {
+        details.push(`GET ${adminPath} shell HTML contains PHP error or escaped backslash paths (\\/)`);
+        failures++;
+      }
+
+      const adminApiUnauth = await fetch(`${baseUrl}${adminPath}api/?action=overview.get`, { redirect: "manual" });
+      if (adminApiUnauth.status !== 401) {
+        details.push(`Unauthenticated GET ${adminPath}api/?action=overview.get returned ${adminApiUnauth.status} (expected 401)`);
+        failures++;
+      }
+
+      if (disc.robots_txt !== false && robotsBody.includes(adminPath)) {
+        details.push(`/robots.txt disclosed configured admin.path (${adminPath})`);
         failures++;
       }
     }
@@ -928,6 +1120,31 @@ async function runGate11DistPackagingVerification(siteRoot: string): Promise<Gat
     }
   }
 
+  const { enabled: adminEnabled, adminPath } = isAdminPanelEnabled(siteRoot);
+  if (adminEnabled) {
+    const adminSegments = adminPath.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
+    const adminShellStub = path.join(distDir, ...adminSegments, "index.php");
+    const adminApiStub = path.join(distDir, ...adminSegments, "api", "index.php");
+    if (!existsSync(adminShellStub)) {
+      details.push(`Missing physical admin stub in dist/: ${adminPath}index.php`);
+      issues++;
+    } else {
+      stubCount++;
+    }
+    if (!existsSync(adminApiStub)) {
+      details.push(`Missing physical admin API stub in dist/: ${adminPath}api/index.php`);
+      issues++;
+    } else {
+      stubCount++;
+    }
+    for (const assetName of ["lumora-admin.js", "lumora-admin.css"]) {
+      if (!existsSync(path.join(distDir, "public", "assets", "admin", assetName))) {
+        details.push(`Missing admin asset in dist/: public/assets/admin/${assetName}`);
+        issues++;
+      }
+    }
+  }
+
   if (issues === 0) {
     details.push(`Verified dist/ contains 0 dev artifacts and ${stubCount} physical canonical route stubs.`);
   }
@@ -991,7 +1208,16 @@ async function runGate12DistProductionServerSmoke(siteRoot: string): Promise<Gat
       checked++;
       const res = await fetch(`${baseUrl}${routePath}`, { redirect: "manual" });
       const body = await res.text();
-      if (res.status !== 200 || !res.headers.get("content-security-policy") || body.includes("Fatal error:")) {
+      if (
+        res.status !== 200 ||
+        !res.headers.get("content-security-policy") ||
+        !body.includes("<!DOCTYPE html>") ||
+        !body.includes('<link rel="stylesheet"') ||
+        body.includes("Fatal error:") ||
+        body.includes("TypeError") ||
+        body.includes('href="\\/') ||
+        body.includes('src="\\/')
+      ) {
         details.push(`dist/ route ${routePath} failed (status=${res.status}, csp=${Boolean(res.headers.get("content-security-policy"))})`);
         failures++;
       }
@@ -1003,7 +1229,16 @@ async function runGate12DistProductionServerSmoke(siteRoot: string): Promise<Gat
       const legalPath = `/legal/${activeLegalSlugs[0]}/`;
       const legalRes = await fetch(`${baseUrl}${legalPath}`, { redirect: "manual" });
       const legalBody = await legalRes.text();
-      if (legalRes.status !== 200 || !legalRes.headers.get("content-security-policy") || legalBody.includes("Fatal error:")) {
+      if (
+        legalRes.status !== 200 ||
+        !legalRes.headers.get("content-security-policy") ||
+        !legalBody.includes("<!DOCTYPE html>") ||
+        !legalBody.includes('<link rel="stylesheet"') ||
+        legalBody.includes("Fatal error:") ||
+        legalBody.includes("TypeError") ||
+        legalBody.includes('href="\\/') ||
+        legalBody.includes('src="\\/')
+      ) {
         details.push(`dist/ route ${legalPath} failed (status=${legalRes.status})`);
         failures++;
       } else {
@@ -1024,9 +1259,41 @@ async function runGate12DistProductionServerSmoke(siteRoot: string): Promise<Gat
       }
       seenRedirects.add(cleanFrom);
       const redirRes = await fetch(`${baseUrl}${cleanFrom}`, { redirect: "manual" });
+      const redirLocation = redirRes.headers.get("location") ?? "";
       redirectChecked++;
-      if (redirRes.status !== 301 && redirRes.status !== 302) {
-        details.push(`dist/ redirect ${cleanFrom} -> ${toPath} returned ${redirRes.status} (expected 301)`);
+      if (
+        (redirRes.status !== 301 && redirRes.status !== 302) ||
+        !redirLocation.startsWith("/") ||
+        redirLocation.startsWith("//") ||
+        redirLocation.includes("\\")
+      ) {
+        details.push(`dist/ redirect ${cleanFrom} -> ${toPath} returned ${redirRes.status} (location=${redirLocation})`);
+        failures++;
+      }
+    }
+
+    const { enabled: adminEnabled, adminPath } = isAdminPanelEnabled(siteRoot);
+    if (adminEnabled) {
+      checked++;
+      const adminRes = await fetch(`${baseUrl}${adminPath}`, { redirect: "manual" });
+      const adminBody = await adminRes.text();
+      const xRobots = adminRes.headers.get("x-robots-tag") ?? "";
+      if (
+        adminRes.status !== 200 ||
+        !adminRes.headers.get("content-security-policy") ||
+        !xRobots.toLowerCase().includes("noindex") ||
+        adminBody.includes("Fatal error:") ||
+        adminBody.includes("\\/")
+      ) {
+        details.push(
+          `dist/ admin shell ${adminPath} failed (status=${adminRes.status}, csp=${Boolean(adminRes.headers.get("content-security-policy"))}, xrobots=${xRobots})`
+        );
+        failures++;
+      }
+
+      const apiRes = await fetch(`${baseUrl}${adminPath}api/?action=overview.get`, { redirect: "manual" });
+      if (apiRes.status !== 401) {
+        details.push(`dist/ admin API ${adminPath}api/?action=overview.get returned ${apiRes.status} (expected 401)`);
         failures++;
       }
     }

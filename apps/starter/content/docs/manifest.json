@@ -1,20 +1,39 @@
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "tracks": {
     "operator": {
       "id": "operator",
       "title": "Framework Architecture & Operations",
       "badge": "CORE",
       "audience": "Engineers & Site Operators",
-      "summary": "Deterministic guides for building, verifying, and deploying zero-dependency PHP 8.2+ enterprise websites.",
+      "summary": "Deterministic guides for configuring lumora.config.php, styling with Tailwind CSS v4, and shipping 12-gate verified builds.",
       "articles": [
         {
           "slug": "getting-started",
           "title": "Getting Started with @astrake/lumora-webserver",
-          "summary": "Configure lumora.config.php, sync the headless micro-kernel, compile Tailwind CSS v4, and pass all 12 compliance gates.",
+          "summary": "Configure lumora.config.php, run the local dev server with auto-provisioned admin setup, compile Tailwind CSS v4, and verify dist/.",
           "file": "getting-started.md",
-          "reading_time": "3 min read",
-          "tags": ["CLI", "Security", "Tailwind v4"]
+          "reading_time": "4 min read",
+          "status": "published",
+          "tags": ["CLI", "Quickstart", "Tailwind v4", "Admin"]
+        }
+      ]
+    },
+    "architecture": {
+      "id": "architecture",
+      "title": "Security & Runtime Hardening",
+      "badge": "SECURITY",
+      "audience": "Platform & Security Architects",
+      "summary": "Deep dive into 128-bit CSP nonces, SHA-384 Subresource Integrity lockfiles, CGNAT-safe v2 CSRF, and SQLite WAL vaults.",
+      "articles": [
+        {
+          "slug": "security-architecture",
+          "title": "Security & Micro-Kernel Architecture",
+          "summary": "Understand how Lumora isolates storage vaults, enforces per-request CSP nonces, and synchronizes hybrid flat-file and SQLite CMS content.",
+          "file": "security-architecture.md",
+          "reading_time": "5 min read",
+          "status": "published",
+          "tags": ["CSP", "SRI", "SQLite WAL", "OWASP ASVS"]
         }
       ]
     }

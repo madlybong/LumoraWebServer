@@ -127,3 +127,28 @@ On every write to `lumora.sqlite`, `InquiryDb::prune()` executes non-blocking re
 3. **Immutable Cache-Busting (`Render::assetUrl()`):**
    - `.htaccess` and `nginx.lumora.conf` serve `.css` and `.js` files with `Cache-Control: public, max-age=31536000, immutable`.
    - `Render::assetUrl()` automatically appends `?v=<8-char-sha256-of-sri>` to `.css` and `.js` URLs so returning browsers immediately fetch updated assets whenever their SRI hash changes in `lumora-lock.json`.
+
+---
+
+## 5. Opt-In Admin Panel & Hybrid SQLite CMS Architecture
+
+When `features.admin_panel` is `true`, Lumora mounts a hardened Vue 3 + `shadcn-vue` (`reka-ui`) + CodeMirror 6 + `lucide-vue-next` SPA (`public/assets/admin/lumora-admin.{js,css}`) behind a configurable `admin.path` (default `/admin/`, customizable e.g. `/_console/`).
+
+1. **Zero-Write Public GET Fast-Path (`AdminDb::connectExisting()`):**
+   - Public requests to `/`, `/blog/`, `/docs/`, `/legal/`, `/contact/`, and `/releases/` call `AdminDb::connectExisting()`, which probes only whether `storage/csrf-secret.php` and `storage/vault-<hmac>/lumora.sqlite` with an initialized `admin_settings` table already exist.
+   - Sites without a previously initialized admin vault incur zero disk writes or SQLite creation on public reads.
+2. **Full-Viewport Shell, CodeMirror 6 Studios & Hybrid SQLite CMS:**
+   - The SPA uses a sticky top bar (`⌘K` Command Palette, route breadcrumb, website link), collapsible 4-group sidebar, 3-zone (`Header` / `Scroll Body` / `Footer`) modal dialogs, and dedicated full-page Studios for Blog, Documentation, Legal Policies, and Channels powered by CodeMirror 6 (`HTML`, `Markdown`, `JSON`, folding, bracket matching, search) plus revision snapshots and 1-click revert-to-file.
+   - SQLite tables (`cms_blog_posts`, `cms_doc_tracks`, `cms_doc_articles`, `cms_legal_docs`, `cms_channels`, `cms_redirects`, `cms_404_logs`, `cms_media`, `cms_releases`) merge cleanly on top of flat repository files (`content/*`, `releases/*`).
+3. **Authentication, RBAC & Second-Factor Security (`AdminAuth`):**
+   - Passwords use `PASSWORD_ARGON2ID` with brute-force IP lockout (`429` after `admin.max_login_attempts`).
+   - HttpOnly `SameSite=Strict` session cookies bind to `HTTP_USER_AGENT` hashes (`ua_hash`), enforce per-session HMAC CSRF tokens (`X-Lumora-Csrf`), and enforce hierarchical RBAC (`owner` > `editor` > `viewer`) filtered by `admin.allowed_roles` with last-owner demotion/deletion protection.
+   - TOTP 2FA implements RFC 6238 HOTP/TOTP with encrypted base32 secrets, time-step replay rejection (`last_totp_step`), single-use bcrypt recovery codes, and offline SVG QR code generation (`qrSvgPath()`).
+4. **Encrypted Settings Vault (`AdminDb`):**
+   - Secrets (`hub.shared_secret`, SMTP password, WhatsApp API key, TOTP secrets) are encrypted via OpenSSL `aes-256-gcm` using HKDF-SHA256 keys derived from `Security::secretKey()`. Ciphertext tampering causes authenticated tag verification failure (`null`).
+5. **Sanitization & Upload Isolation (`AdminSanitizer`):**
+   - HTML content passes through a `DOMDocument` allowlist scrubber that removes active elements (`<script>`, `<iframe>`, event handlers, `javascript:` URLs) while preserving Gate 06 `width`/`height`/`alt` constraints on images.
+   - Uploads accept WebP, AVIF, PNG, and JPEG only after scanning payload headers against `<?php`/`<script`/`<svg` polyglots, verifying MIME via `finfo` and raster dimensions via `getimagesize()`, and writing non-executable `.htaccess` / `index.html` guards inside `public/uploads/`.
+6. **SRI Assets & Zero-Rewrite `dist/` Delivery:**
+   - `packages/admin` compiles AOT with zero `eval()`, zero `new Function()`, and zero third-party CDNs, emitting SRI-locked `lumora-admin.{js,css}`.
+   - `lumora-web build` emits physical `dist/<admin.path>/index.php` and `dist/<admin.path>/api/index.php` stubs plus `dist/public/uploads/.htaccess` so apache/cPanel/Nginx hosts run without rewrite rules.

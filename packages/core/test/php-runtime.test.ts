@@ -576,4 +576,122 @@ return [
       rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+  test("Render::component('layout/head'), Render::headMeta(null), Router::basePath() dot-URI/Windows, BlogEngine parity, DocsEngine markdown, and ReleaseServer::getCatalog()", () => {
+    const runtimeCore = toPosixPath(path.join(resolveRuntimeDir(), "php", "core"));
+    const tempDir = path.join(starterDir, "storage", `.test-sync-${Date.now()}`);
+    mkdirSync(path.join(tempDir, "content", "blog"), { recursive: true });
+    mkdirSync(path.join(tempDir, "storage"), { recursive: true });
+
+    writeFileSync(
+      path.join(tempDir, "lumora.config.php"),
+      "<?php\ndeclare(strict_types=1);\nif (!defined('LUMORA_BOOTSTRAPPED')) { http_response_code(403); exit('Forbidden'); }\nreturn ['brand' => ['name' => 'SyncTest', 'domain' => 'sync.example.com', 'origin' => 'https://sync.example.com'], 'features' => ['blog_engine' => true, 'docs_engine' => true, 'release_server' => true]];\n",
+      "utf8"
+    );
+    writeFileSync(
+      path.join(tempDir, "content", "blog", "file-post.php"),
+      "<?php\ndeclare(strict_types=1);\nif (!defined('LUMORA_BOOTSTRAPPED')) { http_response_code(403); exit('Forbidden'); }\nreturn ['slug' => 'file-post', 'title' => 'File Post', 'date' => '2026-11-14', 'status' => 'published', 'summary' => 'File summary', 'body' => '<p>File body content</p>'];\n",
+      "utf8"
+    );
+
+    try {
+      const res = evalPhpJson<{
+        head_rendered: boolean;
+        head_meta_null_ok: boolean;
+        base_router_dot: string;
+        base_win_root: string;
+        base_win_dir: string;
+        blog_file_match: boolean;
+        blog_sql_match: boolean;
+        docs_op_md: boolean;
+        docs_arch_md: boolean;
+        release_index_passthrough: boolean;
+        release_catalog_count: number;
+        release_first_available: boolean;
+      }>(
+        `
+        define('LUMORA_BOOTSTRAPPED', true);
+        require_once ${JSON.stringify(runtimeCore + "/bootstrap.php")};
+        $starterRoot = ${JSON.stringify(toPosixPath(starterDir))};
+        $tempRoot = ${JSON.stringify(toPosixPath(tempDir))};
+
+        $starterCfg = \\Lumora\\Core\\Bootstrap::init($starterRoot);
+
+        // 1. Nested component('layout/head') & headMeta with null $config
+        ob_start();
+        component('layout/head', ['meta' => ['title' => 'CompTest', 'description' => 'Desc', 'path' => '/']]);
+        $headHtml = ob_get_clean();
+        $nullMeta = \\Lumora\\Core\\Render::headMeta(['title' => 'NullCfg', 'description' => 'D', 'path' => '/'], null);
+
+        // 2. Router::basePath() dot-URI on router.php & Windows backslashes
+        unset($GLOBALS['lumoraBasePath']);
+        $_SERVER['SCRIPT_FILENAME'] = 'C:\\\\site\\\\router.php';
+        $_SERVER['SCRIPT_NAME'] = '/releases/release-manifest.json';
+        $baseRouterDot = \\Lumora\\Core\\Router::basePath();
+
+        unset($GLOBALS['lumoraBasePath']);
+        $_SERVER['SCRIPT_FILENAME'] = 'C:\\\\site\\\\index.php';
+        $_SERVER['SCRIPT_NAME'] = '\\\\index.php';
+        $baseWinRoot = \\Lumora\\Core\\Router::basePath();
+
+        unset($GLOBALS['lumoraBasePath']);
+        $_SERVER['SCRIPT_FILENAME'] = 'C:\\\\site\\\\portal\\\\index.php';
+        $_SERVER['SCRIPT_NAME'] = '\\\\portal\\\\index.php';
+        $baseWinDir = \\Lumora\\Core\\Router::basePath();
+        unset($GLOBALS['lumoraBasePath']);
+
+        // 3. BlogEngine file vs SQLite body/content parity
+        $pdo = \\Lumora\\Core\\AdminDb::connect($tempRoot);
+        $stmt = $pdo->prepare('INSERT INTO cms_blog_posts (slug, title, summary, content_html, category, tags_json, image, author, status, date, source_origin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $now = gmdate('c');
+        $stmt->execute(['sql-post', 'SQL Post', 'SQL summary', '<p>SQL body content</p>', 'Security', '["sqlite"]', '/public/brand/blog-cover.svg', 'Maintainer', 'published', '2026-11-15', 'sqlite', $now, $now]);
+        $posts = \\Lumora\\Core\\BlogEngine::listPosts($tempRoot);
+        $bySlug = [];
+        foreach ($posts as $p) { $bySlug[$p['slug']] = $p; }
+        \\Lumora\\Core\\InquiryDb::resetConnection();
+
+        // 4. DocsEngine::getManifest() file markdown population
+        $de = new \\Lumora\\Core\\DocsEngine($starterRoot . '/content/docs');
+        $manifest = $de->getManifest();
+        $opMd = (string)($manifest['tracks']['operator']['articles'][0]['markdown'] ?? '');
+        $archMd = (string)($manifest['tracks']['architecture']['articles'][0]['markdown'] ?? '');
+
+        // 5. ReleaseServer::tryServe('/releases/') passthrough & getCatalog()
+        $passthrough = \\Lumora\\Core\\ReleaseServer::tryServe('/releases/', $starterCfg, $starterRoot);
+        $catalog = \\Lumora\\Core\\ReleaseServer::getCatalog($starterCfg, $starterRoot);
+
+        echo json_encode([
+          'head_rendered' => str_contains($headHtml, '<!DOCTYPE html>') && str_contains($headHtml, '<title>CompTest</title>'),
+          'head_meta_null_ok' => str_contains($nullMeta, '<title>NullCfg</title>'),
+          'base_router_dot' => $baseRouterDot,
+          'base_win_root' => $baseWinRoot,
+          'base_win_dir' => $baseWinDir,
+          'blog_file_match' => isset($bySlug['file-post']) && $bySlug['file-post']['body'] === $bySlug['file-post']['content'] && $bySlug['file-post']['source_origin'] === 'file',
+          'blog_sql_match' => isset($bySlug['sql-post']) && $bySlug['sql-post']['body'] === '<p>SQL body content</p>' && $bySlug['sql-post']['content'] === '<p>SQL body content</p>' && $bySlug['sql-post']['source_origin'] === 'sqlite',
+          'docs_op_md' => str_contains($opMd, 'lumora.config.php'),
+          'docs_arch_md' => str_contains($archMd, 'CSP'),
+          'release_index_passthrough' => $passthrough === false,
+          'release_catalog_count' => count($catalog['artifacts'] ?? []),
+          'release_first_available' => !empty($catalog['artifacts'][0]['available']),
+        ], JSON_UNESCAPED_SLASHES);
+        `,
+        starterDir
+      );
+
+      expect(res.head_rendered).toBe(true);
+      expect(res.head_meta_null_ok).toBe(true);
+      expect(res.base_router_dot).toBe("");
+      expect(res.base_win_root).toBe("");
+      expect(res.base_win_dir).toBe("/portal");
+      expect(res.blog_file_match).toBe(true);
+      expect(res.blog_sql_match).toBe(true);
+      expect(res.docs_op_md).toBe(true);
+      expect(res.docs_arch_md).toBe(true);
+      expect(res.release_index_passthrough).toBe(true);
+      expect(res.release_catalog_count).toBeGreaterThanOrEqual(1);
+      expect(res.release_first_available).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 });

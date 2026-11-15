@@ -23,6 +23,7 @@ describe("CLI Toolchain & 12-Gate Compliance Verifier on apps/starter", () => {
       const distResult = await buildWebsiteDist({ cwd: starterDir, silent: true });
       expect(distResult.generatedStubs).toContain("/contact/");
       expect(distResult.generatedStubs).toContain("/docs/");
+      expect(distResult.generatedStubs).toContain("/releases/");
       expect(distResult.generatedStubs).toContain("/legal/privacy/");
       expect(distResult.generatedStubs).toContain("/legal/terms/");
 
@@ -297,5 +298,111 @@ return [
       }
     },
     30000
+  );
+
+  test(
+    "compileBrandCss compiles real Tailwind v4 utility rules and adaptive tokens on current platform",
+    async () => {
+      const cssResult = await compileBrandCss({ cwd: starterDir, minify: true, silent: true });
+      const compiled = readFileSync(cssResult.outputPath, "utf8");
+      expect(cssResult.bytes).toBeGreaterThan(2000);
+      expect(compiled).toContain("--lumora-bg");
+      expect(compiled).toContain(".lumora-container");
+      expect(compiled).toContain("display:flex");
+    },
+    30000
+  );
+
+  test(
+    "initWebsite({ withAdmin: true }) passes all 12 hardened compliance gates",
+    async () => {
+      const tmpDir = mkdtempSync(path.join(os.tmpdir(), "lumora-init-admin-test-"));
+      try {
+        await initWebsite({
+          cwd: tmpDir,
+          brandId: "admin-init",
+          brandName: "Admin Init Corp",
+          brandPrefix: "AIN",
+          domain: "admin-init.example.com",
+          legalEntity: "Admin Init Ltd.",
+          withAdmin: true,
+          silent: true,
+        });
+
+        await buildWebsiteDist({ cwd: tmpDir, silent: true });
+        const report = await verifyWebsite({ cwd: tmpDir, silent: true });
+        for (const gate of report.gates) {
+          if (!gate.passed) {
+            throw new Error(`Init+Admin Gate ${gate.gate} (${gate.name}) failed:\n${gate.details.join("\n")}`);
+          }
+        }
+        expect(report.passed).toBe(true);
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    },
+    45000
+  );
+
+  test(
+    "syncWebsite({ withAdmin: true, forceStubs: true, withAgents: true }) upgrades an existing v0.1.x website in-place and passes all 12 gates",
+    async () => {
+      const tmpDir = mkdtempSync(path.join(os.tmpdir(), "lumora-upgrade-admin-test-"));
+      try {
+        await initWebsite({
+          cwd: tmpDir,
+          brandId: "legacy-site",
+          brandName: "Legacy Brand",
+          brandPrefix: "LEG",
+          domain: "legacy.example.com",
+          legalEntity: "Legacy Corp",
+          withAdmin: false,
+          silent: true,
+        });
+
+        expect(existsSync(path.join(tmpDir, "public", "assets", "admin", "lumora-admin.js"))).toBe(false);
+
+        const lock = syncWebsite({
+          cwd: tmpDir,
+          withAdmin: true,
+          forceStubs: true,
+          withAgents: true,
+          silent: true,
+        });
+
+        expect(Object.keys(lock.core_sha256).length).toBeGreaterThanOrEqual(17);
+        expect(existsSync(path.join(tmpDir, "public", "assets", "admin", "lumora-admin.js"))).toBe(true);
+        expect(existsSync(path.join(tmpDir, "public", "assets", "admin", "lumora-admin.css"))).toBe(true);
+        expect(existsSync(path.join(tmpDir, "public", "uploads", ".htaccess"))).toBe(true);
+        expect(existsSync(path.join(tmpDir, "public", "uploads", "index.html"))).toBe(true);
+        expect(existsSync(path.join(tmpDir, "AGENTS.md"))).toBe(true);
+        expect(existsSync(path.join(tmpDir, ".cursorrules"))).toBe(true);
+        expect(existsSync(path.join(tmpDir, "UPGRADING.md"))).toBe(true);
+
+        const cfgRaw = readFileSync(path.join(tmpDir, "lumora.config.php"), "utf8");
+        expect(cfgRaw).toContain("'admin_panel'    => true");
+        expect(cfgRaw).toContain("'admin' => [");
+
+        const pkg = JSON.parse(readFileSync(path.join(tmpDir, "package.json"), "utf8")) as {
+          scripts?: Record<string, string>;
+        };
+        expect(pkg.scripts?.admin).toBe("lumora-web admin");
+
+        const dist = await buildWebsiteDist({ cwd: tmpDir, silent: true });
+        expect(dist.generatedStubs).toContain("/admin/");
+        expect(dist.generatedStubs).toContain("/admin/api/");
+
+        const report = await verifyWebsite({ cwd: tmpDir, silent: true });
+        for (const gate of report.gates) {
+          if (!gate.passed) {
+            throw new Error(`Upgrade+Admin Gate ${gate.gate} (${gate.name}) failed:\n${gate.details.join("\n")}`);
+          }
+        }
+        expect(report.passed).toBe(true);
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    },
+    45000
   );
 });

@@ -45,6 +45,11 @@ final class HubClient
             return trim($envSecret);
         }
 
+        $dbSecret = class_exists(AdminDb::class, false) ? AdminDb::getSetting('hub.shared_secret', $rootDir, true) : null;
+        if (is_string($dbSecret) && trim($dbSecret) !== '') {
+            return trim($dbSecret);
+        }
+
         $resolvedRoot = rtrim(str_replace('\\', '/', $rootDir ?? (string)($GLOBALS['lumoraRootDir'] ?? getcwd())), '/');
         $candidates = [
             Security::vaultDir($resolvedRoot) . '/hub-secret.php',
@@ -62,13 +67,43 @@ final class HubClient
     }
 
     /**
+     * Resolves Hub configuration merged with encrypted admin_settings overrides (zero-write when uninitialized).
+     *
+     * @return array<string, mixed>
+     */
+    public static function resolveHubConfig(array $config, ?string $rootDir = null): array
+    {
+        $hubCfg = is_array($config['hub'] ?? null) ? $config['hub'] : [];
+        if (!class_exists(AdminDb::class, false)) {
+            return $hubCfg;
+        }
+        $dbEnabled = AdminDb::getSetting('hub.enabled', $rootDir, true);
+        if ($dbEnabled !== null && $dbEnabled !== '') {
+            $hubCfg['enabled'] = filter_var($dbEnabled, FILTER_VALIDATE_BOOLEAN);
+        }
+        $dbEndpoint = AdminDb::getSetting('hub.endpoint', $rootDir, true);
+        if (is_string($dbEndpoint) && trim($dbEndpoint) !== '') {
+            $hubCfg['endpoint'] = trim($dbEndpoint);
+        }
+        $dbTimeout = AdminDb::getSetting('hub.timeout_ms', $rootDir, true);
+        if (is_string($dbTimeout) && ctype_digit(trim($dbTimeout))) {
+            $hubCfg['timeout_ms'] = (int)trim($dbTimeout);
+        }
+        $dbFallback = AdminDb::getSetting('hub.fallback_notify', $rootDir, true);
+        if ($dbFallback !== null && $dbFallback !== '') {
+            $hubCfg['fallback_notify'] = filter_var($dbFallback, FILTER_VALIDATE_BOOLEAN);
+        }
+        return $hubCfg;
+    }
+
+    /**
      * Dispatches a newly recorded inquiry to an external HMAC-SHA256 webhook / Central Communication Hub.
      *
      * @return array{synced: bool, http_code: int, hub_receipt: string, error: string, signature: string}
      */
     public static function syncInquiryToHub(array $config, array $record, ?string $rootDir = null): array
     {
-        $hubCfg = $config['hub'] ?? [];
+        $hubCfg = self::resolveHubConfig($config, $rootDir);
         $secret = self::resolveHubSecret($config, $rootDir);
         $timestamp = (string)time();
         $brandId = (string)($config['brand']['id'] ?? 'lumora');
@@ -283,7 +318,186 @@ final class HubClient
             }
         }
 
+        // Overlay encrypted runtime settings configured via Admin Panel (read-only fast-path)
+        if (!class_exists(AdminDb::class, false)) {
+            return $defaults;
+        }
+        $emailMap = [
+            'enabled'    => 'bool',
+            'transport'  => 'str',
+            'to'         => 'str',
+            'from_email' => 'str',
+            'from_name'  => 'str',
+            'smtp_host'  => 'str',
+            'smtp_port'  => 'int',
+            'smtp_user'  => 'str',
+            'smtp_pass'  => 'str',
+            'smtp_tls'   => 'bool',
+        ];
+        foreach ($emailMap as $field => $kind) {
+            $val = AdminDb::getSetting('notify.email.' . $field, $resolvedRoot, true);
+            if ($val === null || $val === '') {
+                continue;
+            }
+            $defaults['email'][$field] = match ($kind) {
+                'bool' => filter_var($val, FILTER_VALIDATE_BOOLEAN),
+                'int'  => (int)$val,
+                default => $val,
+            };
+        }
+
+        $waMap = [
+            'enabled'     => 'bool',
+            'provider'    => 'str',
+            'phone'       => 'str',
+            'api_key'     => 'str',
+            'webhook_url' => 'str',
+            'instance'    => 'str',
+        ];
+        foreach ($waMap as $field => $kind) {
+            $val = AdminDb::getSetting('notify.whatsapp.' . $field, $resolvedRoot, true);
+            if ($val === null || $val === '') {
+                continue;
+            }
+            $defaults['whatsapp'][$field] = $kind === 'bool'
+                ? filter_var($val, FILTER_VALIDATE_BOOLEAN)
+                : $val;
+        }
+
         return $defaults;
+    }
+
+    /**
+     * Retries Hub synchronization (and optionally edge notifications) for a single inquiry receipt.
+     *
+     * @return array<string, mixed>
+     */
+    public static function retryInquiryByReceipt(array $config, string $receiptId, ?string $rootDir = null, bool $includeEdge = false): array
+    {
+        $pdo = InquiryDb::connect($rootDir);
+        if (!$pdo instanceof \PDO) {
+            return ['ok' => false, 'error' => 'Database unavailable'];
+        }
+        $stmt = $pdo->prepare('SELECT * FROM contact_submissions WHERE receipt_id = :r LIMIT 1');
+        $stmt->execute([':r' => $receiptId]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return ['ok' => false, 'error' => 'Inquiry receipt not found'];
+        }
+
+        $details = json_decode((string)($row['details_json'] ?? '{}'), true);
+        $detailsArr = is_array($details) ? $details : [];
+        $record = [
+            'receipt_id'        => (string)($row['receipt_id'] ?? ''),
+            'channel'           => (string)($row['channel'] ?? 'general'),
+            'channel_label'     => (string)($row['channel_label'] ?? ''),
+            'sla_window'        => (string)($row['sla_window'] ?? '1-2 Business Days'),
+            'full_name'         => (string)($row['full_name'] ?? ''),
+            'organization'      => (string)($row['organization'] ?? ''),
+            'email'             => (string)($row['email'] ?? ''),
+            'phone'             => (string)($row['phone'] ?? ''),
+            'subject'           => (string)($row['subject'] ?? ''),
+            'message'           => (string)($row['message'] ?? ''),
+            'consultation_mode' => (string)($row['consultation_mode'] ?? 'online'),
+            'facility_location' => (string)($row['facility_location'] ?? ''),
+            'details'           => $detailsArr,
+            'ip_hash'           => (string)($row['ip_hash'] ?? ''),
+            'user_agent'        => (string)($row['user_agent'] ?? ''),
+            'created_at'        => (string)($row['created_at'] ?? ''),
+        ];
+        if (!empty($detailsArr['_attribution']) && is_array($detailsArr['_attribution'])) {
+            $record['attribution'] = $detailsArr['_attribution'];
+        }
+
+        $hubRes = self::syncInquiryToHub($config, $record, $rootDir);
+        $emailStatus = (string)($row['email_status'] ?? 'skipped');
+        $waStatus = (string)($row['whatsapp_status'] ?? 'skipped');
+
+        if ($includeEdge) {
+            $edge = self::dispatchEdgeNotifications($config, $record, $rootDir);
+            $emailStatus = $edge['email_status'];
+            $waStatus = $edge['whatsapp_status'];
+        }
+
+        InquiryDb::updateDeliveryAndSyncStatus(
+            $receiptId,
+            $emailStatus,
+            $waStatus,
+            $hubRes['synced'] ? 'synced' : 'failed',
+            $hubRes['synced'] ? (string)$hubRes['hub_receipt'] : (string)($row['hub_receipt'] ?? ''),
+            $rootDir
+        );
+
+        return [
+            'ok'              => $hubRes['synced'] || ($includeEdge && ($emailStatus === 'sent' || $waStatus === 'sent')),
+            'receipt_id'      => $receiptId,
+            'synced'          => $hubRes['synced'],
+            'http_code'       => $hubRes['http_code'],
+            'hub_receipt'     => $hubRes['hub_receipt'],
+            'error'           => $hubRes['error'],
+            'email_status'    => $emailStatus,
+            'whatsapp_status' => $waStatus,
+        ];
+    }
+
+    /**
+     * Dispatches a synthetic test message over configured Edge Email or WhatsApp transport.
+     *
+     * @return array{ok: bool, status: string, type: string}
+     */
+    public static function sendTestNotification(array $config, string $type, string $recipient = '', ?string $rootDir = null): array
+    {
+        $notifyCfg = self::resolveNotifyConfig($config, $rootDir);
+        $brandName = (string)($config['brand']['name'] ?? 'Lumora');
+        $record = [
+            'receipt_id'    => 'LUM-TEST-' . strtoupper(bin2hex(random_bytes(3))),
+            'channel'       => 'system-test',
+            'channel_label' => 'Admin Panel Diagnostic Test',
+            'full_name'     => 'System Administrator',
+            'email'         => (string)($notifyCfg['email']['from_email'] ?? 'noreply@localhost'),
+            'subject'       => "Diagnostic notification check for {$brandName}",
+            'message'       => 'This synthetic test verifies your Edge notification transport configuration.',
+            'created_at'    => gmdate('Y-m-d\TH:i:s\Z'),
+        ];
+
+        if ($type === 'hub') {
+            $hubCfg = self::resolveHubConfig($config, $rootDir);
+            if ($recipient !== '') {
+                $hubCfg['endpoint'] = $recipient;
+            }
+            $hubCfg['enabled'] = true;
+            $tempConfig = $config;
+            $tempConfig['hub'] = $hubCfg;
+            $record['test_ping'] = true;
+            $syncRes = self::syncInquiryToHub($tempConfig, $record, $rootDir);
+            $status = $syncRes['synced']
+                ? ('http_' . $syncRes['http_code'])
+                : ($syncRes['error'] !== '' ? $syncRes['error'] : 'failed');
+            return [
+                'ok'        => $syncRes['synced'],
+                'status'    => $status,
+                'http_code' => $syncRes['http_code'],
+                'type'      => 'hub',
+            ];
+        }
+
+        if ($type === 'whatsapp') {
+            $waCfg = $notifyCfg['whatsapp'] ?? [];
+            $waCfg['enabled'] = true;
+            if ($recipient !== '') {
+                $waCfg['phone'] = $recipient;
+            }
+            $status = self::sendEdgeWhatsApp($config, $record, $waCfg, $rootDir);
+            return ['ok' => $status === 'sent', 'status' => $status, 'type' => 'whatsapp'];
+        }
+
+        $emailCfg = $notifyCfg['email'] ?? [];
+        $emailCfg['enabled'] = true;
+        if ($recipient !== '') {
+            $emailCfg['to'] = $recipient;
+        }
+        $status = self::sendEdgeEmail($config, $record, $emailCfg, $rootDir);
+        return ['ok' => $status === 'sent', 'status' => $status, 'type' => 'email'];
     }
 
     public static function formatSummary(array $config, array $record): string

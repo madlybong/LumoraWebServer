@@ -7,12 +7,19 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
 }
 
 component('layout/head', ['meta' => $meta ?? [], 'config' => $config ?? []]);
-component('layout/header', ['config' => $config ?? []]);
+component('layout/header', ['meta' => $meta ?? [], 'config' => $config ?? []]);
 ?>
-<main id="main-content" class="site-shell" style="padding:5rem 0;text-align:center;">
-    <p style="font-family:var(--font-mono);color:var(--color-muted);">HTTP 404</p>
-    <h1>Page Not Found</h1>
-    <p style="color:var(--color-muted);margin-bottom:2rem;">The requested resource could not be found on this server.</p>
-    <a href="<?= e(u('/')) ?>" class="btn-primary">Return to Overview</a>
+<main id="main-content" class="lumora-container py-16 flex-1 flex items-center justify-center">
+    <div class="lumora-card p-8 sm:p-12 max-w-lg w-full text-center space-y-5">
+        <span class="lumora-badge lumora-badge-warning font-mono">HTTP 404</span>
+        <h1 class="text-3xl font-bold tracking-tight">Page Not Found</h1>
+        <p class="text-sm sm:text-base text-[var(--lumora-fg-muted)]">
+            The requested resource could not be located on this server.
+        </p>
+        <div class="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <a href="<?= e(u('/')) ?>" class="lumora-btn lumora-btn-primary">Return to Overview</a>
+            <a href="<?= e(u('/docs/')) ?>" class="lumora-btn lumora-btn-secondary">Browse Documentation</a>
+        </div>
+    </div>
 </main>
 <?php component('layout/footer', ['config' => $config ?? []]); ?>

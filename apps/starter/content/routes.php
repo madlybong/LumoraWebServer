@@ -50,6 +50,15 @@ return [
                 'schema_type' => 'contact',
             ],
         ],
+        '/releases/' => [
+            'template' => 'releases',
+            'meta'     => [
+                'title'       => 'Verified Releases & Checksums — Lumora WebStarter',
+                'description' => 'SHA-256 verified release artifacts, immutable release manifest, and download integrity checks.',
+                'path'        => '/releases/',
+                'schema_type' => 'webpage',
+            ],
+        ],
         '/legal/' => [
             'template' => 'legal-index',
             'meta'     => [
@@ -61,11 +70,13 @@ return [
         ],
     ],
     'redirects' => [
-        '/privacy'  => '/legal/privacy/',
-        '/privacy/' => '/legal/privacy/',
-        '/terms'    => '/legal/terms/',
-        '/terms/'   => '/legal/terms/',
-        '/guide'    => '/docs/',
-        '/guide/'   => '/docs/',
+        '/privacy'   => '/legal/privacy/',
+        '/privacy/'  => '/legal/privacy/',
+        '/terms'     => '/legal/terms/',
+        '/terms/'    => '/legal/terms/',
+        '/guide'     => '/docs/',
+        '/guide/'    => '/docs/',
+        '/downloads'  => '/releases/',
+        '/downloads/' => '/releases/',
     ],
 ];

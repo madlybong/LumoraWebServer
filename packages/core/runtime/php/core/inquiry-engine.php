@@ -38,25 +38,112 @@ final class InquiryEngine
         ];
 
         if (!is_file($file)) {
-            return $defaults;
+            $cfg = $defaults;
+        } else {
+            $loaded = require $file;
+            if (!is_array($loaded)) {
+                $cfg = $defaults;
+            } elseif (isset($loaded['channels']) && is_array($loaded['channels'])) {
+                $cfg = [
+                    'default_channel' => (string)($loaded['default_channel'] ?? $defaults['default_channel']),
+                    'honeypot_mode'   => (string)($loaded['honeypot_mode'] ?? $defaults['honeypot_mode']),
+                    'aliases'         => is_array($loaded['aliases'] ?? null) ? $loaded['aliases'] : [],
+                    'referer_map'     => is_array($loaded['referer_map'] ?? null) ? $loaded['referer_map'] : [],
+                    'channels'        => $loaded['channels'],
+                ];
+            } else {
+                $cfg = array_merge($defaults, ['channels' => $loaded]);
+            }
         }
 
-        $loaded = require $file;
-        if (!is_array($loaded)) {
-            return $defaults;
+        $pdo = class_exists(AdminDb::class, false) ? AdminDb::connectExisting($resolvedRoot) : null;
+        if ($pdo instanceof \PDO) {
+            try {
+                $rows = $pdo->query('SELECT * FROM cms_channels ORDER BY sort_order ASC, id ASC')->fetchAll(\PDO::FETCH_ASSOC);
+                foreach ($rows as $row) {
+                    $key = strtolower(trim((string)($row['channel_key'] ?? '')));
+                    if ($key === '' || preg_match('/^[a-z0-9_-]+$/', $key) !== 1) {
+                        continue;
+                    }
+                    $active = (int)($row['is_active'] ?? 1) === 1;
+                    if (!$active) {
+                        if (isset($cfg['channels'][$key]) && count($cfg['channels']) > 1) {
+                            unset($cfg['channels'][$key]);
+                        }
+                        continue;
+                    }
+                    $existing = is_array($cfg['channels'][$key] ?? null) ? $cfg['channels'][$key] : [];
+                    $label = trim((string)($row['label'] ?? ''));
+                    $desc = trim((string)($row['description'] ?? ''));
+                    $sla = trim((string)($row['sla_window'] ?? ''));
+
+                    $configOverlay = [];
+                    $decodedCfg = json_decode((string)($row['config_json'] ?? '{}'), true);
+                    if (is_array($decodedCfg)) {
+                        foreach (['code', 'subject_placeholder', 'message_label', 'message_placeholder', 'button_text'] as $strField) {
+                            if (isset($decodedCfg[$strField]) && is_string($decodedCfg[$strField]) && trim($decodedCfg[$strField]) !== '') {
+                                $configOverlay[$strField] = trim($decodedCfg[$strField]);
+                            }
+                        }
+                        if (isset($decodedCfg['fields']) && is_array($decodedCfg['fields'])) {
+                            $sanitizedFields = [];
+                            foreach ($decodedCfg['fields'] as $fk => $fDef) {
+                                if (!is_array($fDef)) {
+                                    continue;
+                                }
+                                $fieldKey = strtolower(trim((string)preg_replace('/[^a-zA-Z0-9_]/', '_', (string)$fk), '_'));
+                                if ($fieldKey === '' || in_array($fieldKey, ['name', 'full_name', 'email', 'work_email', 'phone', 'subject', 'message', 'consent', 'channel', 'csrf_token', '_csrf', '_ts', 'website_url'], true)) {
+                                    continue;
+                                }
+                                $fType = strtolower(trim((string)($fDef['type'] ?? 'string')));
+                                if (!in_array($fType, ['enum', 'string'], true)) {
+                                    $fType = 'string';
+                                }
+                                $fLabel = trim((string)($fDef['label'] ?? ''));
+                                $fOptions = [];
+                                if ($fType === 'enum' && is_array($fDef['options'] ?? null)) {
+                                    foreach ($fDef['options'] as $opt) {
+                                        $optStr = trim((string)$opt);
+                                        if ($optStr !== '') {
+                                            $fOptions[] = $optStr;
+                                        }
+                                    }
+                                }
+                                $sanitizedFields[$fieldKey] = [
+                                    'type'          => $fType,
+                                    'label'         => $fLabel !== '' ? $fLabel : ucwords(str_replace('_', ' ', $fieldKey)),
+                                    'required'      => !empty($fDef['required']),
+                                    'max_length'    => max(20, min(500, (int)($fDef['max_length'] ?? $fDef['max'] ?? 200))),
+                                    'options'       => $fOptions,
+                                    'receipt_label' => strtoupper(str_replace('_', ' ', $fieldKey)),
+                                ];
+                            }
+                            $configOverlay['fields'] = $sanitizedFields;
+                        }
+                    }
+
+                    $cfg['channels'][$key] = array_merge([
+                        'code'                => strtoupper(substr($key, 0, 6)),
+                        'label'               => $label !== '' ? $label : ucfirst($key),
+                        'heading'             => $desc !== '' ? $desc : ($label !== '' ? $label : 'Send Inquiry'),
+                        'sla'                 => $sla !== '' ? $sla : '1-2 Business Days',
+                        'subject_placeholder' => 'Subject or reference',
+                        'message_label'       => 'Details *',
+                        'message_placeholder' => 'Share details or questions...',
+                        'button_text'         => 'Send Inquiry',
+                        'fields'              => [],
+                    ], $existing, $configOverlay, array_filter([
+                        'label'   => $label,
+                        'heading' => $desc !== '' ? $desc : null,
+                        'sla'     => $sla,
+                    ], static fn ($v): bool => $v !== null && $v !== ''));
+                }
+            } catch (\Throwable) {
+                // Keep file-based channel configuration
+            }
         }
 
-        if (isset($loaded['channels']) && is_array($loaded['channels'])) {
-            return [
-                'default_channel' => (string)($loaded['default_channel'] ?? $defaults['default_channel']),
-                'honeypot_mode'   => (string)($loaded['honeypot_mode'] ?? $defaults['honeypot_mode']),
-                'aliases'         => is_array($loaded['aliases'] ?? null) ? $loaded['aliases'] : [],
-                'referer_map'     => is_array($loaded['referer_map'] ?? null) ? $loaded['referer_map'] : [],
-                'channels'        => $loaded['channels'],
-            ];
-        }
-
-        return array_merge($defaults, ['channels' => $loaded]);
+        return $cfg;
     }
 
     public static function resolveChannel(?array $postInput = null, ?array $getInput = null, ?string $rootDir = null): string
@@ -450,15 +537,17 @@ final class InquiryEngine
 
         $dbId = InquiryDb::saveSubmission($record, $cfg, $resolvedRoot);
 
-        // Hub sync if enabled
+        // Hub sync if enabled (file config or runtime Admin DB setting)
+        $resolvedHub = HubClient::resolveHubConfig($cfg, $resolvedRoot);
+        $resolvedNotify = HubClient::resolveNotifyConfig($cfg, $resolvedRoot);
         $hubResult = HubClient::syncInquiryToHub($cfg, $record, $resolvedRoot);
-        $syncStatus = $hubResult['synced'] ? 'synced' : (empty($cfg['hub']['enabled']) ? 'skipped' : 'pending');
+        $syncStatus = $hubResult['synced'] ? 'synced' : (empty($resolvedHub['enabled']) ? 'skipped' : 'pending');
 
-        // Standalone Edge notifications (runs when Hub is disabled, or when fallback_notify is enabled and Hub failed)
-        $shouldRunEdgeNotify = empty($cfg['hub']['enabled'])
-            || (!$hubResult['synced'] && !empty($cfg['hub']['fallback_notify']))
-            || !empty($cfg['notifications']['email']['enabled'])
-            || !empty($cfg['notifications']['whatsapp']['enabled']);
+        // Standalone Edge notifications (runs when Hub is disabled, fallback_notify is active, or edge notify enabled)
+        $shouldRunEdgeNotify = empty($resolvedHub['enabled'])
+            || (!$hubResult['synced'] && !empty($resolvedHub['fallback_notify']))
+            || !empty($resolvedNotify['email']['enabled'])
+            || !empty($resolvedNotify['whatsapp']['enabled']);
 
         $emailStatus = 'skipped';
         $waStatus = 'skipped';

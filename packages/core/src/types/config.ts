@@ -104,6 +104,32 @@ export const LumoraFeaturesConfigSchema = z.object({
   release_server: z.boolean().default(false),
   legal_registry: z.boolean().default(true),
   inquiry_engine: z.boolean().default(true),
+  admin_panel: z.boolean().default(false),
+});
+
+export const LumoraAdminBrandingSchema = z.object({
+  title: z.string().min(1).optional(),
+  logo: z.string().optional(),
+  logo_dark: z.string().optional(),
+  default_theme: z.enum(["light", "dark", "system"]).default("system"),
+});
+
+export const LumoraAdminInitialOwnerSchema = z.object({
+  email: z.string().email().optional(),
+  password_hash: z.string().optional(),
+  name: z.string().optional(),
+});
+
+export const LumoraAdminConfigSchema = z.object({
+  path: z.string().default("/admin/"),
+  session_ttl_sec: z.number().int().positive().default(28800),
+  max_login_attempts: z.number().int().positive().default(5),
+  lockout_window_sec: z.number().int().positive().default(900),
+  max_upload_bytes: z.number().int().positive().default(5_242_880),
+  allowed_roles: z.array(z.enum(["owner", "editor", "viewer"])).optional(),
+  require_2fa: z.boolean().default(false),
+  branding: LumoraAdminBrandingSchema.optional(),
+  initial_owner: LumoraAdminInitialOwnerSchema.optional(),
 });
 
 export const LumoraWebConfigSchema = z.object({
@@ -114,9 +140,12 @@ export const LumoraWebConfigSchema = z.object({
   legal: LumoraLegalConfigSchema.optional(),
   discovery: LumoraDiscoveryConfigSchema.optional(),
   features: LumoraFeaturesConfigSchema.optional(),
+  admin: LumoraAdminConfigSchema.optional(),
 });
 
 export type LumoraWebConfig = z.infer<typeof LumoraWebConfigSchema>;
+export type LumoraAdminConfig = z.infer<typeof LumoraAdminConfigSchema>;
+export type LumoraAdminBranding = z.infer<typeof LumoraAdminBrandingSchema>;
 
 export interface LumoraLockfile {
   framework: "@astrake/lumora-webserver";

@@ -8,8 +8,8 @@
 
 | Command | Scope |
 | :--- | :--- |
-| `bun test` | Runs all Bun + PHP 8.2 integration test suites in `packages/core/test/*.test.ts`. |
-| `bun run check` | Runs strict TypeScript typechecking across `tsconfig.base.json`, `packages/core`, and `apps/starter`. |
+| `bun test` | Runs all 5 Bun + PHP 8.2 integration & Admin Console test suites across `packages/core/test/*.test.ts` and `packages/admin/test/*.test.ts`. |
+| `bun run check` | Runs strict TypeScript typechecking across `tsconfig.base.json`, `packages/core`, `packages/admin`, and `apps/starter`. |
 | `bun run verify:starter` | Runs the 12-Gate Compliance Verifier against `apps/starter`. |
 | `bun run validate` | Runs `check` → `test` → `build` → `verify:starter` → `version:sync`. |
 

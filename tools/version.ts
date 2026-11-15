@@ -5,6 +5,7 @@ const root = process.cwd();
 const versionFile = path.join(root, "VERSION");
 const rootPackageFile = path.join(root, "package.json");
 const corePackageFile = path.join(root, "packages", "core", "package.json");
+const adminPackageFile = path.join(root, "packages", "admin", "package.json");
 const starterPackageFile = path.join(root, "apps", "starter", "package.json");
 
 async function readJson<T>(file: string): Promise<T> {
@@ -47,6 +48,7 @@ async function main(): Promise<void> {
   console.log(`\nSyncing version ${version} across all packages...\n`);
   await patchVersion(rootPackageFile, version, "root package.json");
   await patchVersion(corePackageFile, version, "packages/core/package.json");
+  await patchVersion(adminPackageFile, version, "packages/admin/package.json");
   await patchVersion(starterPackageFile, version, "apps/starter/package.json");
   console.log("\nDone.\n");
 }

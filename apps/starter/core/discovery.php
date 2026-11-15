@@ -85,12 +85,7 @@ final class Discovery
                 header('Content-Type: text/plain; charset=UTF-8');
                 header('Cache-Control: public, max-age=3600');
             }
-            $override = self::loadLlmsOverride($config, $rootDir, false);
-            if ($override !== null) {
-                echo $override;
-                return true;
-            }
-            echo self::renderLlmsTxt($config, $rootDir, false);
+            echo self::resolveLlmsContent($config, $rootDir, false);
             return true;
         }
 
@@ -102,12 +97,7 @@ final class Discovery
                 header('Content-Type: text/plain; charset=UTF-8');
                 header('Cache-Control: public, max-age=3600');
             }
-            $override = self::loadLlmsOverride($config, $rootDir, true);
-            if ($override !== null) {
-                echo $override;
-                return true;
-            }
-            echo self::renderLlmsTxt($config, $rootDir, true);
+            echo self::resolveLlmsContent($config, $rootDir, true);
             return true;
         }
 
@@ -149,8 +139,25 @@ final class Discovery
         return false;
     }
 
+    public static function resolveLlmsContent(array $config, string $rootDir, bool $full = false): string
+    {
+        $override = self::loadLlmsOverride($config, $rootDir, $full);
+        if ($override !== null) {
+            return $override;
+        }
+        return self::renderLlmsTxt($config, $rootDir, $full);
+    }
+
     private static function loadLlmsOverride(array $config, string $rootDir, bool $full): ?string
     {
+        if (!empty($config['features']['admin_panel']) && class_exists(AdminDb::class, false)) {
+            $dbKey = $full ? 'discovery.llms_full_txt' : 'discovery.llms_txt';
+            $dbOverride = AdminDb::getSetting($dbKey, $rootDir, true);
+            if (is_string($dbOverride) && trim($dbOverride) !== '') {
+                return $dbOverride;
+            }
+        }
+
         $phpOverride = $rootDir . '/content/llms.php';
         if (is_file($phpOverride) && is_readable($phpOverride)) {
             $result = (static function (string $file, array $config, string $rootDir, bool $full) {
@@ -221,6 +228,19 @@ final class Discovery
         if (self::isEndpointEnabled('sitemap_xml', $config, $rootDir)) {
             $lines[] = '';
             $lines[] = "Sitemap: {$origin}/sitemap.xml";
+        }
+
+        if ($rootDir !== '' && !empty($config['features']['admin_panel']) && class_exists(AdminDb::class, false)) {
+            $robotsExtra = AdminDb::getSetting('discovery.robots_extra', $rootDir, true);
+            if (is_string($robotsExtra) && trim($robotsExtra) !== '') {
+                $lines[] = '';
+                foreach (preg_split('/\r\n|\r|\n/', trim($robotsExtra)) ?: [] as $extraLine) {
+                    $cleanLine = trim((string)$extraLine);
+                    if ($cleanLine !== '') {
+                        $lines[] = $cleanLine;
+                    }
+                }
+            }
         }
 
         return implode("\n", $lines);
@@ -437,6 +457,13 @@ final class Discovery
 
     public static function renderSecurityTxt(array $config, string $rootDir = ''): string
     {
+        if ($rootDir !== '' && !empty($config['features']['admin_panel']) && class_exists(AdminDb::class, false)) {
+            $dbSec = AdminDb::getSetting('discovery.security_txt', $rootDir, true);
+            if (is_string($dbSec) && trim($dbSec) !== '') {
+                return rtrim($dbSec) . "\n";
+            }
+        }
+
         $brand = $config['brand'] ?? [];
         $disc = $config['discovery'] ?? [];
         $origin = rtrim((string)($brand['origin'] ?? 'https://localhost'), '/');

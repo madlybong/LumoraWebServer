@@ -1,8 +1,8 @@
 # Project Overview — `@astrake/lumora-webserver`
 
 **Package Name:** `@astrake/lumora-webserver`  
-**Current Version:** `0.1.2`  
-**Runtime Requirements:** PHP `8.2+` (`pdo_sqlite`, `curl`, `mbstring`), Bun `1.3+` (build & verification CLI)  
+**Current Version:** `0.2.0`  
+**Runtime Requirements:** PHP `8.2+` (`pdo_sqlite`, `curl`, `mbstring`, `openssl`), Bun `1.3+` (build & verification CLI)  
 **License:** MIT  
 
 ---
@@ -34,6 +34,8 @@ Whether building personal portfolios, studio sites, SaaS marketing sites, or reg
 4. **Dual-Mode First-Party Inquiry Persistence & Dispatch:**
    - Every form submission is validated in strict Gate 09 order and persisted in `<1ms` to an isolated local SQLite3 Write-Ahead Logging (WAL) database (`storage/vault-<hmac>/lumora.sqlite`) plus an atomic `flock` JSONL failover ledger (`contacts-backup.jsonl`).
    - Websites can operate in **Standalone Edge Mode** (native TLS 1.2/1.3 SMTP socket + self-hosted WAHA/Evolution/Webhook WhatsApp) or **Central Hub Mode** (HMAC-SHA256 signed webhook sync to a compatible receiver endpoint with automatic outbox replay via `lumora-web flush`).
+5. **Opt-In Admin Console & Hybrid SQLite CMS (`features.admin_panel`):**
+   - Websites can optionally enable an AOT Vue 3 + `shadcn-vue` + CodeMirror 6 Admin Console behind a stealth configurable `admin.path`, managing Inquiries, Hub/Edge Dispatch, Channels, Blog, Docs, Media Library, Legal Policies, Routes & 404 Redirects, Discovery/SEO, Releases, Security Audit Logs, Users/RBAC, and RFC 6238 TOTP 2FA with zero SQLite writes on uninitialized public GET requests.
 
 ---
 

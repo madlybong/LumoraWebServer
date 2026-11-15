@@ -1,10 +1,34 @@
 @theme {
-  --color-canvas: #fafafa;
-  --color-surface: #ffffff;
-  --color-surface-inv: #09090b;
-  --color-ink: #09090b;
-  --color-ink-inv: #ffffff;
-  --color-muted: #52525b;
-  --color-accent: #0055ff;
-  --color-border: #e4e4e7;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+:root {
+  accent-color: #2563eb;
+  --lumora-bg: light-dark(#ffffff, #09090b);
+  --lumora-bg-subtle: light-dark(#fafafa, #0f1117);
+  --lumora-surface: light-dark(#ffffff, #18181b);
+  --lumora-surface-muted: light-dark(#f4f4f5, #27272a);
+  --lumora-fg: light-dark(#09090b, #fafafa);
+  --lumora-fg-muted: light-dark(#52525b, #a1a1aa);
+  --lumora-border: light-dark(#e4e4e7, #27272a);
+  --lumora-border-strong: light-dark(#d4d4d8, #3f3f46);
+  --lumora-accent: #2563eb;
+  --lumora-accent-hover: #1d4ed8;
+  --lumora-accent-fg: light-dark(#1d4ed8, #60a5fa);
+  --lumora-accent-soft: light-dark(#eff6ff, rgba(37, 99, 235, 0.16));
+  --lumora-success-bg: light-dark(#ecfdf5, rgba(16, 185, 129, 0.14));
+  --lumora-success-fg: light-dark(#047857, #6ee7b7);
+  --lumora-success-border: light-dark(#a7f3d0, rgba(16, 185, 129, 0.35));
+  --lumora-warning-bg: light-dark(#fffbeb, rgba(245, 158, 11, 0.14));
+  --lumora-warning-fg: light-dark(#b45309, #fcd34d);
+  --lumora-warning-border: light-dark(#fde68a, rgba(245, 158, 11, 0.35));
+  --lumora-danger-bg: light-dark(#fef2f2, rgba(239, 68, 68, 0.14));
+  --lumora-danger-fg: light-dark(#b91c1c, #fca5a5);
+  --lumora-danger-border: light-dark(#fecaca, rgba(239, 68, 68, 0.35));
+  --lumora-radius-sm: 0.375rem;
+  --lumora-radius-md: 0.625rem;
+  --lumora-radius-lg: 0.875rem;
+  --lumora-shadow-sm: light-dark(0 1px 2px 0 rgba(9, 9, 11, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.35));
+  --lumora-shadow-md: light-dark(0 8px 24px -6px rgba(9, 9, 11, 0.1), 0 10px 28px -6px rgba(0, 0, 0, 0.55));
 }

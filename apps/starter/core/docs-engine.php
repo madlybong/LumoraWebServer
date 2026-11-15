@@ -16,25 +16,166 @@ final class DocsEngine
 {
     private string $docsRoot;
     private string $manifestPath;
+    private string $siteRoot;
 
     public function __construct(?string $docsRoot = null)
     {
         $root = (string)($GLOBALS['lumoraRootDir'] ?? getcwd());
         $this->docsRoot = $docsRoot ?? ($root . DIRECTORY_SEPARATOR . 'content' . DIRECTORY_SEPARATOR . 'docs');
         $this->manifestPath = $this->docsRoot . DIRECTORY_SEPARATOR . 'manifest.json';
+        $this->siteRoot = preg_match('#[/\\\\]content[/\\\\]docs$#', $this->docsRoot) === 1
+            ? dirname($this->docsRoot, 2)
+            : $root;
     }
 
-    public function getManifest(): array
+    public function getManifest(?bool $includeDrafts = null): array
     {
-        if (!is_file($this->manifestPath)) {
-            return ['version' => '0.1.0', 'tracks' => []];
+        $manifest = ['version' => '0.1.0', 'tracks' => []];
+        if (is_file($this->manifestPath)) {
+            $raw = (string)@file_get_contents($this->manifestPath);
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded) && isset($decoded['tracks']) && is_array($decoded['tracks'])) {
+                $manifest = $decoded;
+            }
         }
-        $raw = (string)@file_get_contents($this->manifestPath);
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded) || !isset($decoded['tracks']) || !is_array($decoded['tracks'])) {
-            return ['version' => '0.1.0', 'tracks' => []];
+
+        $allowDrafts = $includeDrafts ?? Security::isLocalhost();
+        $realDocsRoot = realpath($this->docsRoot);
+
+        foreach ($manifest['tracks'] as $trackKey => $track) {
+            if (!is_array($track)) {
+                continue;
+            }
+            $filteredArticles = [];
+            foreach (($track['articles'] ?? []) as $art) {
+                if (!is_array($art)) {
+                    continue;
+                }
+                $status = strtolower((string)($art['status'] ?? 'published'));
+                if ($status === 'draft' && !$allowDrafts) {
+                    continue;
+                }
+                $markdown = isset($art['markdown']) && is_string($art['markdown']) ? $art['markdown'] : '';
+                if ($markdown === '' && !empty($art['file']) && is_string($art['file']) && $realDocsRoot !== false) {
+                    $rel = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $art['file']);
+                    $realCandidate = realpath($this->docsRoot . DIRECTORY_SEPARATOR . $rel);
+                    if (
+                        $realCandidate !== false
+                        && str_starts_with($realCandidate, $realDocsRoot . DIRECTORY_SEPARATOR)
+                        && is_file($realCandidate)
+                    ) {
+                        $markdown = (string)@file_get_contents($realCandidate);
+                    }
+                }
+                $art['markdown'] = $markdown;
+                $art['status'] = $status;
+                $art['tags'] = is_array($art['tags'] ?? null) ? $art['tags'] : [];
+                $art['source_origin'] = (string)($art['source_origin'] ?? 'file');
+                $art['has_file_origin'] = $art['source_origin'] === 'file' || !empty($art['has_file_origin']);
+                if (empty($art['reading_time'])) {
+                    $art['reading_time'] = Render::readingTime($markdown) . ' min read';
+                }
+                $filteredArticles[] = $art;
+            }
+            $manifest['tracks'][$trackKey]['source_origin'] = 'file';
+            $manifest['tracks'][$trackKey]['has_file_origin'] = true;
+            $manifest['tracks'][$trackKey]['articles'] = $filteredArticles;
         }
-        return $decoded;
+
+        $pdo = class_exists(AdminDb::class, false) ? AdminDb::connectExisting($this->siteRoot) : null;
+        if (!$pdo instanceof \PDO) {
+            return $manifest;
+        }
+
+        try {
+            $tracks = $manifest['tracks'];
+            $trackRows = $pdo->query('SELECT * FROM cms_docs_tracks ORDER BY sort_order ASC, id ASC')->fetchAll(\PDO::FETCH_ASSOC);
+            foreach ($trackRows as $tr) {
+                $tid = (string)($tr['track_id'] ?? '');
+                if ($tid === '') {
+                    continue;
+                }
+                if (!isset($tracks[$tid]) || !is_array($tracks[$tid])) {
+                    $tracks[$tid] = [
+                        'title'           => (string)($tr['title'] ?? $tid),
+                        'description'     => (string)($tr['description'] ?? ''),
+                        'sort_order'      => (int)($tr['sort_order'] ?? 100),
+                        'source_origin'   => 'sqlite',
+                        'has_file_origin' => false,
+                        'articles'        => [],
+                    ];
+                } else {
+                    if (!empty($tr['title'])) {
+                        $tracks[$tid]['title'] = (string)$tr['title'];
+                    }
+                    if (isset($tr['description']) && $tr['description'] !== '') {
+                        $tracks[$tid]['description'] = (string)$tr['description'];
+                    }
+                    $tracks[$tid]['sort_order'] = (int)($tr['sort_order'] ?? 100);
+                    $tracks[$tid]['source_origin'] = 'sqlite';
+                    $tracks[$tid]['has_file_origin'] = true;
+                    if (!isset($tracks[$tid]['articles']) || !is_array($tracks[$tid]['articles'])) {
+                        $tracks[$tid]['articles'] = [];
+                    }
+                }
+            }
+
+            $sql = $allowDrafts
+                ? 'SELECT * FROM cms_docs_articles ORDER BY sort_order ASC, id ASC'
+                : 'SELECT * FROM cms_docs_articles WHERE status = "published" ORDER BY sort_order ASC, id ASC';
+            $artRows = $pdo->query($sql)->fetchAll(\PDO::FETCH_ASSOC);
+            foreach ($artRows as $ar) {
+                $tid = (string)($ar['track_id'] ?? 'operator');
+                $slug = (string)($ar['slug'] ?? '');
+                if ($slug === '') {
+                    continue;
+                }
+                if (!isset($tracks[$tid]) || !is_array($tracks[$tid])) {
+                    $tracks[$tid] = [
+                        'title'           => ucfirst(str_replace('-', ' ', $tid)),
+                        'description'     => '',
+                        'source_origin'   => 'sqlite',
+                        'has_file_origin' => false,
+                        'articles'        => [],
+                    ];
+                }
+                $tags = json_decode((string)($ar['tags_json'] ?? '[]'), true);
+                $markdown = (string)($ar['markdown'] ?? '');
+
+                $replacedIdx = null;
+                foreach ($tracks[$tid]['articles'] as $idx => $existing) {
+                    if (($existing['slug'] ?? '') === $slug) {
+                        $replacedIdx = $idx;
+                        break;
+                    }
+                }
+
+                $entry = [
+                    'slug'            => $slug,
+                    'title'           => (string)($ar['title'] ?? $slug),
+                    'summary'         => (string)($ar['summary'] ?? ''),
+                    'markdown'        => $markdown,
+                    'reading_time'    => Render::readingTime($markdown) . ' min read',
+                    'tags'            => is_array($tags) ? $tags : [],
+                    'status'          => strtolower((string)($ar['status'] ?? 'published')),
+                    'sort_order'      => (int)($ar['sort_order'] ?? 100),
+                    'source_origin'   => 'sqlite',
+                    'has_file_origin' => $replacedIdx !== null && !empty($tracks[$tid]['articles'][$replacedIdx]['has_file_origin']),
+                ];
+
+                if ($replacedIdx !== null) {
+                    $tracks[$tid]['articles'][$replacedIdx] = $entry;
+                } else {
+                    $tracks[$tid]['articles'][] = $entry;
+                }
+            }
+
+            $manifest['tracks'] = $tracks;
+        } catch (\Throwable) {
+            // Ignore when cms_docs_* tables are unavailable
+        }
+
+        return $manifest;
     }
 
     public function renderArticle(string $trackId, string $slug): array
@@ -96,15 +237,17 @@ final class DocsEngine
         $parsed = $this->parseMarkdown($markdown);
 
         return [
-            'found'        => true,
-            'track_id'     => $matchedTrackId,
-            'slug'         => (string)$matchedArticle['slug'],
-            'title'        => (string)$matchedArticle['title'],
-            'summary'      => (string)($matchedArticle['summary'] ?? ''),
-            'reading_time' => (string)($matchedArticle['reading_time'] ?? (Render::readingTime($markdown) . ' min read')),
-            'tags'         => is_array($matchedArticle['tags'] ?? null) ? $matchedArticle['tags'] : [],
-            'html'         => $parsed['html'],
-            'toc'          => $parsed['toc'],
+            'found'         => true,
+            'track_id'      => $matchedTrackId,
+            'slug'          => (string)$matchedArticle['slug'],
+            'title'         => (string)$matchedArticle['title'],
+            'summary'       => (string)($matchedArticle['summary'] ?? ''),
+            'reading_time'  => (string)($matchedArticle['reading_time'] ?? (Render::readingTime($markdown) . ' min read')),
+            'tags'          => is_array($matchedArticle['tags'] ?? null) ? $matchedArticle['tags'] : [],
+            'status'        => strtolower((string)($matchedArticle['status'] ?? 'published')),
+            'source_origin' => (string)($matchedArticle['source_origin'] ?? 'file'),
+            'html'          => $parsed['html'],
+            'toc'           => $parsed['toc'],
         ];
     }
 
@@ -118,9 +261,6 @@ final class DocsEngine
         $manifest = $this->getManifest();
         $results = [];
         $realDocsRoot = realpath($this->docsRoot);
-        if ($realDocsRoot === false) {
-            return [];
-        }
 
         foreach ($manifest['tracks'] as $trackId => $track) {
             foreach ($track['articles'] ?? [] as $article) {
@@ -128,8 +268,8 @@ final class DocsEngine
                     $body = $article['markdown'];
                 } else {
                     $rel = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, (string)($article['file'] ?? ''));
-                    $realFile = realpath($this->docsRoot . DIRECTORY_SEPARATOR . $rel);
-                    $body = ($realFile !== false && str_starts_with($realFile, $realDocsRoot . DIRECTORY_SEPARATOR))
+                    $realFile = $realDocsRoot !== false ? realpath($this->docsRoot . DIRECTORY_SEPARATOR . $rel) : false;
+                    $body = ($realDocsRoot !== false && $realFile !== false && str_starts_with($realFile, $realDocsRoot . DIRECTORY_SEPARATOR))
                         ? (string)@file_get_contents($realFile)
                         : '';
                 }
@@ -365,6 +505,14 @@ final class DocsEngine
         ];
     }
 
+    public static function renderMarkdownText(string $markdown, ?string $siteRoot = null): array
+    {
+        $docsRoot = $siteRoot !== null
+            ? rtrim(str_replace('\\', '/', $siteRoot), '/') . '/content/docs'
+            : null;
+        return (new self($docsRoot))->parseMarkdown($markdown);
+    }
+
     private function notFoundResult(string $trackId, string $slug): array
     {
         return [
@@ -386,6 +534,34 @@ final class DocsEngine
         $escaped = preg_replace('/`([^`]+)`/', '<code class="doc-inline-code">$1</code>', $escaped) ?? $escaped;
         $escaped = preg_replace('/\*\*([^*]+)\*\*/', '<strong>$1</strong>', $escaped) ?? $escaped;
         $escaped = preg_replace('/\*([^*]+)\*/', '<em>$1</em>', $escaped) ?? $escaped;
+
+        $siteRoot = $this->siteRoot;
+        $escaped = preg_replace_callback(
+            '/!\[([^\]]*)\]\(([^)]+)\)/',
+            static function (array $matches) use ($siteRoot): string {
+                $alt = $matches[1];
+                $src = html_entity_decode($matches[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                if (!str_starts_with($src, '/') && !str_starts_with($src, 'https://')) {
+                    return $alt;
+                }
+                if (str_starts_with($src, '//') || preg_match('/[\x00-\x20]/', $src) === 1) {
+                    return $alt;
+                }
+                $dims = '';
+                if (str_starts_with($src, '/public/') && $siteRoot !== '') {
+                    $localFile = rtrim(str_replace('\\', '/', $siteRoot), '/') . $src;
+                    if (is_file($localFile)) {
+                        $info = @getimagesize($localFile);
+                        if (is_array($info) && (int)($info[0] ?? 0) > 0 && (int)($info[1] ?? 0) > 0) {
+                            $dims = ' width="' . (int)$info[0] . '" height="' . (int)$info[1] . '"';
+                        }
+                    }
+                }
+                return '<img src="' . Render::escape($src) . '" alt="' . $alt . '"' . $dims . ' loading="lazy" decoding="async" />';
+            },
+            $escaped
+        ) ?? $escaped;
+
         $escaped = preg_replace_callback(
             '/\[([^\]]+)\]\(([^)]+)\)/',
             static function (array $matches): string {

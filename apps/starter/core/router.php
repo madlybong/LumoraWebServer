@@ -15,14 +15,19 @@ final class Router
         if (isset($GLOBALS['lumoraBasePath']) && is_string($GLOBALS['lumoraBasePath'])) {
             return $GLOBALS['lumoraBasePath'];
         }
+        $scriptFile = str_replace('\\', '/', (string)($_SERVER['SCRIPT_FILENAME'] ?? ''));
+        if (basename($scriptFile) === 'router.php') {
+            return $GLOBALS['lumoraBasePath'] = '';
+        }
         $scriptName = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
-        $dir = rtrim(dirname($scriptName), '/.');
+        $rawDir = str_replace('\\', '/', dirname($scriptName));
+        $dir = rtrim($rawDir, '/.');
         if ($dir === '' || $dir === '/') {
             return $GLOBALS['lumoraBasePath'] = '';
         }
         // If executing from a generated physical route stub (e.g. /contact/index.php),
         // compute base path relative to the website root directory.
-        if ($rootDir !== null && isset($_SERVER['SCRIPT_FILENAME'])) {
+        if ($rootDir !== null && $scriptFile !== '') {
             $realRoot = realpath($rootDir);
             $realScriptDir = realpath(dirname((string)$_SERVER['SCRIPT_FILENAME']));
             if ($realRoot !== false && $realScriptDir !== false && str_starts_with($realScriptDir, $realRoot)) {
@@ -32,7 +37,8 @@ final class Router
                 }
             }
         }
-        return $GLOBALS['lumoraBasePath'] = rtrim($dir, '/');
+        $normalized = rtrim(str_replace('\\', '/', $dir), '/');
+        return $GLOBALS['lumoraBasePath'] = ($normalized === '' || $normalized === '/' ? '' : $normalized);
     }
 
     public static function url(string $path, ?string $basePath = null): string
@@ -115,6 +121,34 @@ final class Router
             return self::buildRedirect($redirects[$slashedPath]);
         }
 
+        // 2b. Check runtime SQLite CMS redirects when admin panel is active (zero-write fast-path)
+        if (!empty($config['features']['admin_panel'])) {
+            $pdo = class_exists(AdminDb::class, false) ? AdminDb::connectExisting($rootDir) : null;
+            if ($pdo instanceof \PDO) {
+                try {
+                    $stmt = $pdo->prepare(
+                        'SELECT id, target_url, status_code FROM cms_redirects WHERE is_active = 1 AND source_path IN (:p1, :p2, :p3) LIMIT 1'
+                    );
+                    $stmt->execute([':p1' => $path, ':p2' => $trimmedPath, ':p3' => $slashedPath]);
+                    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                    if (is_array($row) && !empty($row['target_url'])) {
+                        if (!empty($row['id'])) {
+                            try {
+                                $pdo->prepare('UPDATE cms_redirects SET hits = hits + 1, last_hit_at = :now WHERE id = :id')
+                                    ->execute([':now' => gmdate('Y-m-d\TH:i:s\Z'), ':id' => (int)$row['id']]);
+                            } catch (\Throwable) {
+                                // Telemetry update must never block redirect delivery
+                            }
+                        }
+                        $code = (int)($row['status_code'] ?? 301) === 302 ? 302 : 301;
+                        return self::buildRedirect((string)$row['target_url'], $code);
+                    }
+                } catch (\Throwable) {
+                    // Fail closed to normal routing if table is unavailable
+                }
+            }
+        }
+
         // 3. Special file endpoint: /blog/feed.xml
         if ($path === '/blog/feed.xml' && !empty($config['features']['blog_engine'])) {
             return ['endpoint' => 'blog-feed', 'status' => 200, 'canonical_path' => '/blog/feed.xml'];
@@ -131,12 +165,12 @@ final class Router
             if (!empty($matched['localhost_only_draft']) && !Security::isLocalhost()) {
                 return ['template' => '404', 'status' => 404, 'canonical_path' => $path];
             }
-            return array_merge([
+            return self::applyRouteSeoOverride(array_merge([
                 'status'         => 200,
                 'canonical_path' => $path,
                 'params'         => [],
                 'meta'           => [],
-            ], $matched);
+            ], $matched), $config, $rootDir);
         }
 
         // 6. Match statutory legal routes: /legal/{slug}/
@@ -144,7 +178,7 @@ final class Router
             $slug = $m[1];
             $doc = LegalRegistry::resolveDocument($slug, $config, $rootDir);
             if ($doc !== null) {
-                return [
+                return self::applyRouteSeoOverride([
                     'template'       => 'legal',
                     'status'         => 200,
                     'canonical_path' => $path,
@@ -158,7 +192,7 @@ final class Router
                         'slug'       => $slug,
                         'legal_data' => $doc,
                     ],
-                ];
+                ], $config, $rootDir);
             }
         }
 
@@ -170,7 +204,7 @@ final class Router
                 $docs = new DocsEngine($rootDir . '/content/docs');
                 $article = $docs->renderArticle($track, $slug);
                 if ($article['found']) {
-                    return [
+                    return self::applyRouteSeoOverride([
                         'template'       => is_file($rootDir . '/templates/docs-article.php') ? 'docs-article' : 'docs',
                         'status'         => 200,
                         'canonical_path' => $path,
@@ -184,7 +218,7 @@ final class Router
                             'doc_article'  => $article,
                             'doc_manifest' => $docs->getManifest(),
                         ],
-                    ];
+                    ], $config, $rootDir);
                 }
             }
         }
@@ -193,7 +227,7 @@ final class Router
         if (!empty($config['features']['blog_engine'])) {
             if (preg_match('#^/blog/page/(\d+)/$#', $path, $m)) {
                 $pageNum = max(1, (int)$m[1]);
-                return [
+                return self::applyRouteSeoOverride([
                     'template'       => 'blog-index',
                     'status'         => 200,
                     'canonical_path' => $path,
@@ -206,33 +240,48 @@ final class Router
                     'params'         => [
                         'page_num' => $pageNum,
                     ],
-                ];
+                ], $config, $rootDir);
             }
 
             if (preg_match('#^/blog/([a-z0-9-]+)/$#', $path, $m)) {
                 $slug = $m[1];
                 $post = BlogEngine::getPost($slug, $rootDir);
                 if ($post !== null) {
-                    return [
+                    $postMeta = [
+                        'title'       => !empty($post['meta_title'])
+                            ? (string)$post['meta_title']
+                            : (($post['title'] ?? $slug) . ' — ' . ($config['brand']['name'] ?? '')),
+                        'description' => !empty($post['meta_description'])
+                            ? (string)$post['meta_description']
+                            : (string)($post['summary'] ?? $post['excerpt'] ?? ''),
+                        'path'        => $path,
+                        'schema_type' => 'blog',
+                    ];
+                    $postImage = trim((string)($post['og_image'] ?? $post['image'] ?? ''));
+                    if ($postImage !== '') {
+                        $postMeta['image'] = $postImage;
+                    }
+                    if (!empty($post['canonical_url'])) {
+                        $postMeta['canonical'] = (string)$post['canonical_url'];
+                    }
+                    return self::applyRouteSeoOverride([
                         'template'       => 'blog-article',
                         'status'         => 200,
                         'canonical_path' => $path,
-                        'meta'           => [
-                            'title'       => ($post['title'] ?? $slug) . ' — ' . ($config['brand']['name'] ?? ''),
-                            'description' => (string)($post['summary'] ?? $post['excerpt'] ?? ''),
-                            'path'        => $path,
-                            'schema_type' => 'blog',
-                        ],
+                        'meta'           => $postMeta,
                         'params'         => [
                             'slug'      => $slug,
                             'post_data' => $post,
                         ],
-                    ];
+                    ], $config, $rootDir);
                 }
             }
         }
 
         // 9. Unmatched route -> 404
+        if (!empty($config['features']['admin_panel']) && class_exists(AdminDb::class, false)) {
+            AdminDb::record404($path, (string)($_SERVER['HTTP_REFERER'] ?? ''), $rootDir);
+        }
         return [
             'template'       => '404',
             'status'         => 404,
@@ -247,15 +296,62 @@ final class Router
         ];
     }
 
-    private static function buildRedirect(string $target): array
+    private static function applyRouteSeoOverride(array $resolved, array $config, string $rootDir): array
     {
+        if (empty($config['features']['admin_panel']) || !class_exists(AdminDb::class, false)) {
+            return $resolved;
+        }
+        $pdo = AdminDb::connectExisting($rootDir);
+        if (!$pdo instanceof \PDO) {
+            return $resolved;
+        }
+        $canonicalPath = (string)($resolved['canonical_path'] ?? '');
+        if ($canonicalPath === '') {
+            return $resolved;
+        }
+        try {
+            $stmt = $pdo->prepare('SELECT meta_title, meta_description, og_image, robots FROM cms_route_seo WHERE route_path = :rp LIMIT 1');
+            $stmt->execute([':rp' => $canonicalPath]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (is_array($row)) {
+                $meta = is_array($resolved['meta'] ?? null) ? $resolved['meta'] : [];
+                if (!empty($row['meta_title'])) {
+                    $meta['title'] = (string)$row['meta_title'];
+                }
+                if (!empty($row['meta_description'])) {
+                    $meta['description'] = (string)$row['meta_description'];
+                }
+                if (!empty($row['og_image'])) {
+                    $meta['image'] = (string)$row['og_image'];
+                }
+                if (!empty($row['robots'])) {
+                    $meta['robots'] = (string)$row['robots'];
+                }
+                $resolved['meta'] = $meta;
+            }
+        } catch (\Throwable) {
+            // Fail closed to declared meta
+        }
+        return $resolved;
+    }
+
+    private static function buildRedirect(string|array $target, int $statusCode = 301): array
+    {
+        if (is_array($target)) {
+            $dest = (string)($target['target'] ?? $target['url'] ?? '/');
+            $code = (int)($target['status'] ?? $statusCode);
+        } else {
+            $dest = $target;
+            $code = $statusCode;
+        }
+        $normalizedCode = $code === 302 ? 302 : 301;
         $queryString = (string)($_SERVER['QUERY_STRING'] ?? '');
-        if ($queryString !== '' && !str_contains($target, '?')) {
-            $target .= '?' . $queryString;
+        if ($queryString !== '' && !str_contains($dest, '?')) {
+            $dest .= '?' . $queryString;
         }
         return [
-            'redirect' => $target,
-            'status'   => 301,
+            'redirect' => $dest,
+            'status'   => $normalizedCode,
         ];
     }
 }

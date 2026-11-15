@@ -10,7 +10,14 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { compileBrandCss } from "./css-compiler";
-import { loadPhpLegalSlugs, loadPhpSiteConfig, loadPhpSiteRoutes, resolveRuntimeDir, toPosixPath } from "./paths";
+import {
+  loadPhpLegalSlugs,
+  loadPhpSiteConfig,
+  loadPhpSiteRoutes,
+  normalizeAdminPathTs,
+  resolveRuntimeDir,
+  toPosixPath,
+} from "./paths";
 import { syncWebsite } from "./sync";
 
 export interface BuildDistOptions {
@@ -120,10 +127,43 @@ export async function buildWebsiteDist(options: BuildDistOptions = {}): Promise<
 
   // 7. Generate physical zero-rewrite route stubs (dist/<route>/index.php)
   const siteConfig = loadPhpSiteConfig(siteRoot) as {
-    features?: { docs_engine?: boolean; blog_engine?: boolean };
+    features?: { docs_engine?: boolean; blog_engine?: boolean; admin_panel?: boolean };
+    admin?: { path?: string };
   };
   const routeConfig = loadPhpSiteRoutes(siteRoot);
   const canonicalRoutes = new Set<string>();
+
+  if (siteConfig.features?.admin_panel) {
+    const adminPath = normalizeAdminPathTs(siteConfig.admin?.path);
+    canonicalRoutes.add(adminPath);
+    canonicalRoutes.add(`${adminPath}api/`);
+
+    const distUploadsDir = path.join(distDir, "public", "uploads");
+    mkdirSync(distUploadsDir, { recursive: true });
+    writeFileSync(
+      path.join(distUploadsDir, ".htaccess"),
+      [
+        "<IfModule mod_php.c>",
+        "    php_flag engine off",
+        "</IfModule>",
+        '<FilesMatch "\\.(?i:php[0-9]?|phtml|phar|pl|py|cgi|sh|svg|svgz|html?|xhtml)$">',
+        "    <IfModule mod_authz_core.c>",
+        "        Require all denied",
+        "    </IfModule>",
+        "    <IfModule !mod_authz_core.c>",
+        "        Order deny,allow",
+        "        Deny from all",
+        "    </IfModule>",
+        "</FilesMatch>",
+        "<IfModule mod_headers.c>",
+        '    Header always set X-Content-Type-Options "nosniff"',
+        "</IfModule>",
+        "Options -Indexes -ExecCGI",
+        "",
+      ].join("\n"),
+      "utf8"
+    );
+  }
 
   for (const routePath of Object.keys(routeConfig.routes)) {
     if (routePath !== "/" && !/\.[a-zA-Z0-9]{1,6}$/.test(routePath)) {

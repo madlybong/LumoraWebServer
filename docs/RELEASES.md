@@ -9,6 +9,7 @@ The following files are synchronized:
 
 - [`package.json`](../package.json) — workspace root
 - [`packages/core/package.json`](../packages/core/package.json) — published npm package (`@astrake/lumora-webserver`)
+- [`packages/admin/package.json`](../packages/admin/package.json) — Vue 3 + CodeMirror 6 Admin Console workspace
 - [`apps/starter/package.json`](../apps/starter/package.json) — reference starter website
 
 **Sync command:**
@@ -42,13 +43,13 @@ The recommended release flow is:
 The workflow then automatically:
 
 1. Detects the `VERSION` file change.
-2. Sets up PHP 8.3, Bun 1.3.14, and Node 22 (`@astrake` scope).
+2. Sets up PHP 8.3, Bun 1.4.4, and Node 24 (`@astrake` scope).
 3. Installs dependencies and syncs all package versions.
-4. Builds `packages/core` and `apps/starter/dist`.
+4. Builds `packages/admin`, `packages/core`, and `apps/starter/dist`.
 5. Runs TypeScript checks, unit/integration tests, and the 12-Gate Compliance Verifier (`bun run verify:starter`).
-6. Generates and commits an updated `CHANGELOG.md`.
+6. Generates or preserves the release entry in `CHANGELOG.md`.
 7. Creates a `vX.Y.Z` git tag.
-8. Packs `packages/core` via `bun pm pack` (running `prepack` to bundle `README.md`, `CHANGELOG.md`, `llms.txt`, `llms-full.txt`, and `AGENTS.md`).
+8. Packs `packages/core` via `bun pm pack` (running `prepack` to bundle `README.md`, `CHANGELOG.md`, `LICENSE`, `llms.txt`, `llms-full.txt`, `AGENTS.md`, `UPGRADING.md`, and `.cursorrules`).
 9. Creates a **GitHub Release** with the changelog excerpt and `.tgz` artifact attached.
 10. Publishes `@astrake/lumora-webserver` to the public npm registry (`npm publish *.tgz --access public`). On the initial release, npm automatically creates the `@astrake/lumora-webserver` package under the `@astrake` organization.
 

@@ -11,7 +11,8 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <?= lumora_head_meta($meta ?? []) ?>
+    <?= lumora_head_meta($meta ?? [], $config ?? []) ?>
+    <script nonce="<?= e(lumora_csp_nonce()) ?>">try{const s=localStorage.getItem('color-scheme');if(s==='light'||s==='dark'){const m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=s;document.documentElement.style.colorScheme=s;}}catch(_){}</script>
 </head>
 <body>
 <a href="#main-content" class="lumora-skip-link">Skip to main content</a>

@@ -20,6 +20,10 @@ require_once __DIR__ . '/legal-registry.php';
 require_once __DIR__ . '/docs-engine.php';
 require_once __DIR__ . '/blog-engine.php';
 require_once __DIR__ . '/release-server.php';
+require_once __DIR__ . '/admin-db.php';
+require_once __DIR__ . '/admin-sanitizer.php';
+require_once __DIR__ . '/admin-auth.php';
+require_once __DIR__ . '/admin-controller.php';
 
 final class Bootstrap
 {
@@ -93,6 +97,11 @@ final class Bootstrap
 
         // Check discovery & system endpoints first (/health, /robots.txt, /sitemap.xml, /llms.txt, etc.)
         if (Discovery::tryServe($relativePath, $config, self::$rootDir, $basePath)) {
+            return;
+        }
+
+        // Dispatch stealth modular Admin Console & API when enabled
+        if (!empty($config['features']['admin_panel']) && AdminController::tryServe($relativePath, $config, self::$rootDir, $basePath)) {
             return;
         }
 

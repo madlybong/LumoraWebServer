@@ -1,6 +1,6 @@
 # @astrake/lumora-webserver
 
-> `@astrake/lumora-webserver` (`v0.1.2`) is a brand-neutral, zero-dependency headless PHP 8.2+ website micro-kernel, Tailwind CSS v4 brand layer compiler, zero-rewrite `dist/` bundler (`cPanel` / `aaPanel` / `Apache` / `Nginx`), and 12-Gate Automated Verifier.
+> `@astrake/lumora-webserver` (`v0.2.0`) is a brand-neutral, zero-dependency headless PHP 8.2+ website micro-kernel, Tailwind CSS v4 brand layer compiler, opt-in Vue 3 + CodeMirror 6 Admin Console & Hybrid SQLite CMS, zero-rewrite `dist/` bundler (`cPanel` / `aaPanel` / `Apache` / `Nginx`), and 12-Gate Automated Verifier.
 
 ## Documentation & Specifications
 
@@ -9,6 +9,7 @@
 - [Project Overview (`docs/PROJECT.md`)](./docs/PROJECT.md): Ecosystem architecture, security posture, and configurable compliance controls.
 - [System Architecture (`docs/ARCHITECTURE.md`)](./docs/ARCHITECTURE.md): Request lifecycle, v2 CGNAT-safe CSRF, SQLite3 WAL + JSONL persistence, and CSS compilation pipeline.
 - [User Guide — Getting Started (`docs/user/GETTING_STARTED.md`)](./docs/user/GETTING_STARTED.md): Scaffolding, building templates, adding routes/channels/docs/blog, and running `lumora-web`.
+- [User Guide — Upgrading Existing Websites (`docs/user/UPGRADING.md`)](./docs/user/UPGRADING.md): Zero-hallucination agentic upgrade playbook from `0.1.x` to `0.2.0` and enabling the Admin Console.
 - [User Guide — Configuration Reference (`docs/user/CONFIGURATION.md`)](./docs/user/CONFIGURATION.md): Exhaustive schema reference for `lumora.config.php`, `content/routes.php`, `content/channels.php`, and `content/legal/{slug}.php`.
 - [User Guide — Production Deployment (`docs/user/DEPLOYMENT.md`)](./docs/user/DEPLOYMENT.md): Deploying `dist/` to Apache/cPanel, Nginx/aaPanel, Cloudflare/reverse proxies, and configuring Edge SMTP/WhatsApp or Hub sync.
 - [Developer Guide — Contributing (`docs/developer/CONTRIBUTING.md`)](./docs/developer/CONTRIBUTING.md): Monorepo structure, PHP 8.2+ & TypeScript coding conventions, and release workflow.
@@ -29,13 +30,18 @@
 - `Lumora\Core\DocsEngine` (`docs-engine.php`): Manifest-jailed Markdown parser with GitHub alerts, tables, auto-TOC, full-text search, and `dist/` manifest inlining.
 - `Lumora\Core\BlogEngine` (`blog-engine.php`): File-based PHP blog engine with pagination, localhost draft guard, and `/blog/feed.xml` Atom 1.0 feed.
 - `Lumora\Core\ReleaseServer` (`release-server.php`): RFC 9110 `Range` (`206 Partial Content`) binary artifact server (`/releases/*`, `release-manifest.json`, `SHA256SUMS`) with `X-Checksum-Sha256`.
+- `Lumora\Core\AdminDb` (`admin-db.php`): Zero-write public GET SQLite connector (`connectExisting()`), Hybrid CMS schema migrations, audit logger, and OpenSSL `aes-256-gcm` + `hash_hkdf` encrypted settings vault.
+- `Lumora\Core\AdminSanitizer` (`admin-sanitizer.php`): DOMDocument HTML XSS sanitizer, Gate-06 `<img>` attribute/dimension enforcer, and polyglot-safe raster image upload pipeline (`public/uploads/`).
+- `Lumora\Core\AdminAuth` (`admin-auth.php`): Argon2id password hashing, RBAC (`owner` > `editor` > `viewer`, `allowed_roles`), UA-bound sessions, session-bound CSRF, RFC 6238 TOTP 2FA with replay protection & recovery codes, and dual-path Owner bootstrap (`initial_owner` / `LUMORA_ADMIN_SETUP_TOKEN`).
+- `Lumora\Core\AdminController` (`admin-controller.php`): Stealth `admin.path` SPA shell & JSON API controller for inquiries, blog, docs, routing redirects, media, legal, channels, dispatch settings, releases, security logs, and users.
 
 ## CLI Commands (`lumora-web`)
 
-- `lumora-web init`: Scaffold a new website project (`--brand-id`, `--brand-name`, `--prefix`, `--domain`, `--entity`).
-- `lumora-web sync`: Copy locked PHP core & `lumora-core.js` and update SHA-256 + SHA-384 SRI hashes in `lumora-lock.json`.
+- `lumora-web init`: Scaffold a new website project (`--brand-id`, `--brand-name`, `--prefix`, `--domain`, `--entity`, `--with-agents`, `--with-admin`).
+- `lumora-web sync`: Copy locked 17-module PHP core, `lumora-core.js`, and (when enabled) `lumora-admin.{js,css}` and update SHA-256 + SHA-384 SRI hashes in `lumora-lock.json` (`--force-stubs`, `--with-agents`, `--with-admin`).
 - `lumora-web css`: Compile `lumora-base.css` + `css/brand-theme.css` + `css/brand.css` via Tailwind CSS v4 into `public/assets/css/lumora.min.css`.
 - `lumora-web dev`: Start local `php -S` dev server with live CSS/SRI rebuild watcher.
 - `lumora-web build`: Assemble zero-dependency `dist/` bundle with physical `<route>/index.php` stubs, `.htaccess`, and `nginx.lumora.conf`.
 - `lumora-web verify`: Execute all 12 automated security, accessibility, legal, SQLite WAL, and `dist/` compliance gates.
 - `lumora-web flush`: Replay pending SQLite WAL outbox inquiries to the configured Hub webhook.
+- `lumora-web admin`: Manage admin panel operators and hashes (`create-user`, `list-users`, `reset-password`, `disable-2fa`, `revoke-sessions`, `hash-password`).

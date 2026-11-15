@@ -4,6 +4,39 @@
 
 ---
 
+## [0.2.0] — 2026-11-16
+
+### Added
+
+- **Opt-In Vue 3 + CodeMirror 6 Admin Console (`packages/admin` & `packages/core/runtime/admin/`):**
+  - Enterprise full-viewport admin shell (`h-dvh overflow-hidden`) featuring a sticky top app bar with route breadcrumbs, `⌘K` Command Palette, quick external website link, collapsible 4-group sidebar, and independent scroll container.
+  - Full-page split-pane Studios powered by CodeMirror 6 (`@codemirror/lang-html`, `@codemirror/lang-markdown`, `@codemirror/lang-json`, line numbers, code folding, bracket matching, search, and adaptive dark/light themes) for Blog Articles, Documentation, Legal Policies, Form Channels, and Discovery/SEO overrides.
+  - Standardized 3-zone (`Header` / `Scroll Body` / `Footer`) modal dialogs across media picking, revision history diffs, and confirmation flows.
+- **4 New Headless PHP 8.2+ Core Modules (`13` → `17` modules in `Lumora\Core`):**
+  - `AdminDb` (`core/admin-db.php`): Zero-write public GET fast-path (`connectExisting()`), Hybrid CMS SQLite schema (`admin_users`, `admin_sessions`, `admin_settings`, `admin_audit_logs`, `cms_blog_posts`, `cms_doc_tracks`, `cms_doc_articles`, `cms_legal_docs`, `cms_channels`, `cms_redirects`, `cms_404_logs`, `cms_media`, `cms_releases`, `cms_revisions`), revision snapshots, and OpenSSL `aes-256-gcm` + `hash_hkdf` encrypted secrets vault.
+  - `AdminAuth` (`core/admin-auth.php`): `PASSWORD_ARGON2ID` password hashing, IP brute-force lockout (`429`), User-Agent-bound `HttpOnly` `SameSite=Strict` sessions, per-session HMAC CSRF (`X-Lumora-Csrf`), hierarchical RBAC (`owner` > `editor` > `viewer`) with `admin.allowed_roles` and last-owner guard, RFC 6238 TOTP 2FA with replay protection (`last_totp_step`) & single-use recovery codes, offline QR SVG matrix generator, and dual-path Owner bootstrap (`admin.initial_owner` / `LUMORA_ADMIN_SETUP_TOKEN`).
+  - `AdminSanitizer` (`core/admin-sanitizer.php`): Allowlist `DOMDocument` HTML sanitizer stripping `<script>`, `<iframe>`, event handlers, and `javascript:` URIs while enforcing Gate-06 `width`/`height`/`alt` constraints, plus polyglot-safe raster upload validation (`public/uploads/` with `.htaccess` & `index.html` script guards).
+  - `AdminController` (`core/admin-controller.php`): Stealth `admin.path` SPA host (`X-Robots-Tag: noindex, nofollow`, `Cache-Control: no-store`) and JSON API across Inquiries CRM (triage status, internal notes, bulk actions, CSV export), Hub & Edge Dispatch settings & test delivery, Form Channels Studio, Blog Studio, Documentation Studio, Media Library, Legal Policies Studio, Routes & 404 Monitor (with 1-click 404-to-301 redirect promotion), Discovery & SEO Studio, Releases Manager, Security & Audit Logs, Users & RBAC, and Profile & 2FA.
+- **Admin CLI & Agentic Foreign-Project Upgrade Suite:**
+  - New `lumora-web admin` subcommands (`create-user`, `list-users`, `reset-password`, `disable-2fa`, `revoke-sessions`, `hash-password`).
+  - Added `--with-admin` flag to both `lumora-web init` and `lumora-web sync` for non-destructive upgrades of existing `0.1.x` websites (`lumora.config.php`, `package.json`, `router.php`, `.htaccess`, `core/*.php`, `public/assets/admin/`, `public/uploads/`, `lumora-lock.json`).
+  - Added [`docs/user/UPGRADING.md`](docs/user/UPGRADING.md) (also packed at `UPGRADING.md` inside `@astrake/lumora-webserver`) with deterministic Path A/Path B upgrade commands and copy-pasteable AI coding agent prompts.
+
+### Changed
+
+- **Hybrid Flat-File + SQLite CMS Resolution:** Updated `BlogEngine`, `DocsEngine`, `LegalRegistry`, `InquiryEngine`, `Router`, `Discovery`, and `ReleaseServer` to merge SQLite CMS records and overrides seamlessly on top of repository flat files (`content/*`, `releases/*`) while preserving zero disk writes on uninitialized sites.
+- **Reference Starter Application (`apps/starter`):** Overhauled with adaptive light/dark Zinc + Electric Blue design tokens (`css/brand-theme.css`, `css/brand.css`), CSP-nonced first-paint theme persistence, `/releases/` showcase template, localhost Admin Console onboarding links, and `v0.2.0` reference artifacts.
+- **12-Gate Automated Compliance Verifier (`lumora-web verify`):** Expanded Gates 01, 04, 06, 09, 10, 11, and 12 to validate Admin Console SRI assets, zero-write public GET fast-path, `AdminSanitizer` XSS/polyglot guards, `AdminDb` AES-256-GCM tamper rejection, stealth `admin.path` HTTP headers, and physical `dist/<admin.path>/` zero-rewrite stubs.
+- **Changelog Automation (`tools/changelog.ts`):** Preserves manually authored/curated release sections when `CHANGELOG.md` already contains an entry for the target version unless `--force` is passed.
+
+### Fixed
+
+- Resolved local `@tailwindcss/cli` binary resolution across nested workspace `node_modules/.bin` paths in `compileBrandCss()`.
+- Replaced HTML5 `<search>` tag with `<div role="search">` in `InquiriesView.vue` to eliminate Vue compiler component-resolution runtime errors, wrapped admin views in single-root `<div>` containers for `<Transition mode="out-in">` stability, and guarded hash-route studio watchers per active view.
+- Replaced hardcoded `'0.1.2'` template version fallbacks in `packages/core/src/cli/init.ts` with dynamic `resolvePackageVersion()`.
+
+---
+
 ## [0.1.2] — 2026-11-14
 
 ### Changed

@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { compileBrandCss } from "./css-compiler";
-import { resolveFrameworkDoc } from "./paths";
+import { resolveFrameworkDoc, resolvePackageVersion } from "./paths";
 import { syncWebsite } from "./sync";
 
 export interface InitWebsiteOptions {
@@ -12,6 +12,7 @@ export interface InitWebsiteOptions {
   domain?: string;
   legalEntity?: string;
   withAgents?: boolean;
+  withAdmin?: boolean;
   silent?: boolean;
 }
 
@@ -22,6 +23,8 @@ export async function initWebsite(options: InitWebsiteOptions = {}): Promise<voi
   const brandPrefix = options.brandPrefix ?? "SITE";
   const domain = options.domain ?? "example.com";
   const legalEntity = options.legalEntity?.trim() || "";
+  const withAdmin = Boolean(options.withAdmin);
+  const pkgVersion = resolvePackageVersion();
 
   mkdirSync(path.join(siteRoot, "css"), { recursive: true });
   mkdirSync(path.join(siteRoot, "content", "legal"), { recursive: true });
@@ -30,6 +33,9 @@ export async function initWebsite(options: InitWebsiteOptions = {}): Promise<voi
   mkdirSync(path.join(siteRoot, "public", "fonts"), { recursive: true });
 
   const legalEntityLine = legalEntity !== "" ? `\n        'legal_entity'  => '${legalEntity}',` : "";
+  const adminBlock = withAdmin
+    ? `\n    'admin' => [\n        'path'     => '/admin/',\n        'branding' => [\n            'title'         => '${brandName} Console',\n            'logo'          => '/public/brand/icon.svg',\n            'default_theme' => 'system',\n        ],\n    ],`
+    : "";
 
   const configPath = path.join(siteRoot, "lumora.config.php");
   if (!existsSync(configPath)) {
@@ -50,10 +56,10 @@ return [
         'name'          => '${brandName}',${legalEntityLine}
         'domain'        => '${domain}',
         'origin'        => 'https://${domain}',
-        'version'       => '0.1.2',
+        'version'       => '${pkgVersion}',
         'locale'        => 'en',
-        'theme_color'   => '#0a0a0a',
-        'color_scheme'  => 'light',
+        'theme_color'   => '#09090b',
+        'color_scheme'  => 'light dark',
         'category'      => 'BusinessApplication',
         'slogan'        => 'Web Platform Powered by Lumora',
         'contact_email' => 'contact@${domain}',
@@ -96,7 +102,8 @@ return [
         'release_server' => false,
         'legal_registry' => true,
         'inquiry_engine' => true,
-    ],
+        'admin_panel'    => ${withAdmin ? "true" : "false"},
+    ],${adminBlock}
 ];
 `,
       "utf8"
@@ -108,12 +115,38 @@ return [
     writeFileSync(
       themeCssPath,
       `@theme {
-  --color-canvas: #fafafa;
-  --color-surface: #ffffff;
-  --color-ink: #0a0a0a;
-  --color-muted: #52525b;
-  --color-accent: #0055ff;
-  --color-border: #e4e4e7;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+:root {
+  accent-color: #2563eb;
+  --lumora-bg: light-dark(#ffffff, #09090b);
+  --lumora-bg-subtle: light-dark(#fafafa, #0f1117);
+  --lumora-surface: light-dark(#ffffff, #18181b);
+  --lumora-surface-muted: light-dark(#f4f4f5, #27272a);
+  --lumora-fg: light-dark(#09090b, #fafafa);
+  --lumora-fg-muted: light-dark(#52525b, #a1a1aa);
+  --lumora-border: light-dark(#e4e4e7, #27272a);
+  --lumora-border-strong: light-dark(#d4d4d8, #3f3f46);
+  --lumora-accent: #2563eb;
+  --lumora-accent-hover: #1d4ed8;
+  --lumora-accent-fg: light-dark(#1d4ed8, #60a5fa);
+  --lumora-accent-soft: light-dark(#eff6ff, rgba(37, 99, 235, 0.16));
+  --lumora-success-bg: light-dark(#ecfdf5, rgba(16, 185, 129, 0.14));
+  --lumora-success-fg: light-dark(#047857, #6ee7b7);
+  --lumora-success-border: light-dark(#a7f3d0, rgba(16, 185, 129, 0.35));
+  --lumora-warning-bg: light-dark(#fffbeb, rgba(245, 158, 11, 0.14));
+  --lumora-warning-fg: light-dark(#b45309, #fcd34d);
+  --lumora-warning-border: light-dark(#fde68a, rgba(245, 158, 11, 0.35));
+  --lumora-danger-bg: light-dark(#fef2f2, rgba(239, 68, 68, 0.14));
+  --lumora-danger-fg: light-dark(#b91c1c, #fca5a5);
+  --lumora-danger-border: light-dark(#fecaca, rgba(239, 68, 68, 0.35));
+  --lumora-radius-sm: 0.375rem;
+  --lumora-radius-md: 0.625rem;
+  --lumora-radius-lg: 0.875rem;
+  --lumora-shadow-sm: light-dark(0 1px 2px 0 rgba(9, 9, 11, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.35));
+  --lumora-shadow-md: light-dark(0 8px 24px -6px rgba(9, 9, 11, 0.1), 0 10px 28px -6px rgba(0, 0, 0, 0.55));
 }
 `,
       "utf8"
@@ -124,14 +157,240 @@ return [
   if (!existsSync(brandCssPath)) {
     writeFileSync(
       brandCssPath,
-      `@import "@astrake/lumora-webserver/runtime/css/lumora-base.css";
-@import "./brand-theme.css";
+      `@import "tailwindcss";
 
-body {
-  margin: 0;
-  background-color: var(--color-canvas);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
+@layer base {
+  html {
+    background-color: var(--lumora-bg);
+    color: var(--lumora-fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--lumora-bg-subtle);
+    color: var(--lumora-fg);
+    line-height: 1.65;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--lumora-accent);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .lumora-container {
+    width: 100%;
+    max-width: 72rem;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+
+  @media (min-width: 640px) {
+    .lumora-container {
+      padding-inline: 2rem;
+    }
+  }
+
+  .lumora-skip-link {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+
+  .lumora-skip-link:focus-visible {
+    position: fixed;
+    left: 1rem;
+    top: 1rem;
+    width: auto;
+    height: auto;
+    z-index: 80;
+    padding: 0.625rem 1rem;
+    border-radius: var(--lumora-radius-md);
+    background-color: var(--lumora-accent);
+    color: #ffffff;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .lumora-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    border-bottom: 1px solid var(--lumora-border);
+    background-color: color-mix(in srgb, var(--lumora-bg) 88%, transparent);
+    backdrop-filter: blur(12px);
+  }
+
+  .lumora-nav-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.4375rem 0.75rem;
+    border-radius: var(--lumora-radius-sm);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--lumora-fg-muted);
+    text-decoration: none;
+  }
+
+  .lumora-nav-link:hover,
+  .lumora-nav-link[aria-current="page"] {
+    background-color: var(--lumora-surface-muted);
+    color: var(--lumora-fg);
+  }
+
+  .lumora-card {
+    background-color: var(--lumora-surface);
+    border: 1px solid var(--lumora-border);
+    border-radius: var(--lumora-radius-lg);
+    box-shadow: var(--lumora-shadow-sm);
+  }
+
+  .lumora-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.125rem;
+    min-height: 2.5rem;
+    border-radius: var(--lumora-radius-md);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+
+  .lumora-btn-primary {
+    background-color: var(--lumora-accent);
+    color: #ffffff;
+  }
+
+  .lumora-btn-secondary {
+    background-color: var(--lumora-surface);
+    color: var(--lumora-fg);
+    border-color: var(--lumora-border-strong);
+  }
+
+  .lumora-btn-ghost {
+    background-color: transparent;
+    color: var(--lumora-fg-muted);
+    padding-inline: 0.625rem;
+  }
+
+  .lumora-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid var(--lumora-border);
+    background-color: var(--lumora-surface-muted);
+    color: var(--lumora-fg-muted);
+    text-decoration: none;
+  }
+
+  .lumora-badge-accent {
+    background-color: var(--lumora-accent-soft);
+    color: var(--lumora-accent-fg);
+  }
+
+  .lumora-input,
+  .lumora-textarea {
+    width: 100%;
+    border-radius: var(--lumora-radius-md);
+    border: 1px solid var(--lumora-border-strong);
+    background-color: var(--lumora-surface);
+    color: var(--lumora-fg);
+    padding: 0.625rem 0.875rem;
+    font-size: 0.9375rem;
+  }
+
+  .lumora-input[aria-invalid="true"],
+  .lumora-textarea[aria-invalid="true"],
+  .lumora-input:user-invalid,
+  .lumora-textarea:user-invalid {
+    border-color: var(--lumora-danger-fg);
+  }
+
+  .lumora-field-error {
+    margin-top: 0.375rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--lumora-danger-fg);
+  }
+
+  .lumora-field-error:empty {
+    display: none;
+  }
+
+  .lumora-alert-success {
+    border-radius: var(--lumora-radius-md);
+    border: 1px solid var(--lumora-success-border);
+    background-color: var(--lumora-success-bg);
+    color: var(--lumora-success-fg);
+    padding: 0.875rem 1rem;
+  }
+
+  .lumora-alert-danger {
+    border-radius: var(--lumora-radius-md);
+    border: 1px solid var(--lumora-danger-border);
+    background-color: var(--lumora-danger-bg);
+    color: var(--lumora-danger-fg);
+    padding: 0.875rem 1rem;
+  }
+
+  dialog[data-lumora-nav-drawer] {
+    margin: 0 0 0 auto;
+    height: 100dvh;
+    max-height: 100dvh;
+    width: min(22rem, 88vw);
+    border: 0;
+    border-left: 1px solid var(--lumora-border);
+    background-color: var(--lumora-surface);
+    color: var(--lumora-fg);
+    padding: 1.25rem;
+  }
+
+  dialog[data-lumora-nav-drawer]::backdrop {
+    background-color: rgba(9, 9, 11, 0.58);
+    backdrop-filter: blur(4px);
+  }
+
+  [data-lumora-theme-toggle] [data-theme-icon="sun"] {
+    display: none;
+  }
+
+  [data-lumora-theme-toggle] [data-theme-icon="moon"] {
+    display: inline-flex;
+  }
+
+  :root:has(> head > meta[name="color-scheme"][content="dark"]) [data-lumora-theme-toggle] [data-theme-icon="sun"] {
+    display: inline-flex;
+  }
+
+  :root:has(> head > meta[name="color-scheme"][content="dark"]) [data-lumora-theme-toggle] [data-theme-icon="moon"] {
+    display: none;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not(:has(> head > meta[name="color-scheme"][content="light"])) [data-lumora-theme-toggle] [data-theme-icon="sun"] {
+      display: inline-flex;
+    }
+
+    :root:not(:has(> head > meta[name="color-scheme"][content="light"])) [data-lumora-theme-toggle] [data-theme-icon="moon"] {
+      display: none;
+    }
+  }
 }
 `,
       "utf8"
@@ -167,6 +426,15 @@ return [
                 'description' => 'Get in touch with ${brandName}.',
                 'path'        => '/contact/',
                 'schema_type' => 'contact',
+            ],
+        ],
+        '/legal/' => [
+            'template' => 'legal-index',
+            'meta'     => [
+                'title'       => 'Legal & Governance — ${brandName}',
+                'description' => 'Privacy Policy, Terms of Use, and governance notices for ${brandName}.',
+                'path'        => '/legal/',
+                'schema_type' => 'legal',
             ],
         ],
     ],
@@ -294,7 +562,8 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <?= lumora_head_meta($meta ?? []) ?>
+    <?= lumora_head_meta($meta ?? [], $config ?? []) ?>
+    <script nonce="<?= e(lumora_csp_nonce()) ?>">try{const s=localStorage.getItem('color-scheme');if(s==='light'||s==='dark'){const m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=s;document.documentElement.style.colorScheme=s;}}catch(_){}</script>
 </head>
 <body>
 <a href="#main-content" class="lumora-skip-link">Skip to main content</a>
@@ -305,16 +574,65 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
     http_response_code(403);
     exit('Forbidden');
 }
+
+use Lumora\\Core\\AdminDb;
+use Lumora\\Core\\LegalRegistry;
+use Lumora\\Core\\Security;
+
+$brandName = (string)($config['brand']['name'] ?? 'Lumora');
+$rawPath = (string)($meta['path'] ?? ($_SERVER['REQUEST_URI'] ?? '/'));
+$cleanCurrent = '/' . trim((string)parse_url($rawPath, PHP_URL_PATH), '/') . '/';
+if ($cleanCurrent === '//') {
+    $cleanCurrent = '/';
+}
+$showAdmin = Security::isLocalhost() && !empty($config['features']['admin_panel']);
+$adminHref = $showAdmin ? u(AdminDb::normalizeAdminPath($config ?? [])) : '';
+$legalSlugs = LegalRegistry::activeSlugs($config ?? [], $GLOBALS['lumoraRootDir'] ?? null);
 ?>
-<header>
-    <nav aria-label="Primary Navigation">
-        <a href="<?= e(u('/')) ?>"><?= e($config['brand']['name'] ?? 'Lumora') ?></a>
-        <a href="<?= e(u('/contact/')) ?>">Contact</a>
-        <?php if (in_array('privacy', \Lumora\Core\LegalRegistry::activeSlugs($config ?? []), true)): ?>
-            <a href="<?= e(u('/legal/privacy/')) ?>">Privacy</a>
-        <?php endif; ?>
-    </nav>
+<header class="lumora-header">
+    <div class="lumora-container flex items-center justify-between gap-4 py-3.5">
+        <a href="<?= e(u('/')) ?>" class="inline-flex items-center gap-2.5 font-bold text-base no-underline">
+            <img src="<?= e(asset_url('/public/brand/icon.svg')) ?>" alt="<?= e($brandName) ?>" width="32" height="32" class="h-8 w-8 rounded-lg shrink-0" />
+            <span><?= e($brandName) ?></span>
+        </a>
+        <nav class="hidden md:flex items-center gap-1" aria-label="Primary Navigation">
+            <a href="<?= e(u('/')) ?>" class="lumora-nav-link" <?= $cleanCurrent === '/' ? 'aria-current="page"' : '' ?>>Overview</a>
+            <a href="<?= e(u('/contact/')) ?>" class="lumora-nav-link" <?= str_starts_with($cleanCurrent, '/contact/') ? 'aria-current="page"' : '' ?>>Contact</a>
+            <?php if (!empty($legalSlugs)): ?>
+                <a href="<?= e(u('/legal/')) ?>" class="lumora-nav-link" <?= str_starts_with($cleanCurrent, '/legal/') ? 'aria-current="page"' : '' ?>>Legal</a>
+            <?php endif; ?>
+        </nav>
+        <div class="flex items-center gap-2 shrink-0">
+            <?php if ($showAdmin): ?>
+                <a href="<?= e($adminHref) ?>" class="lumora-badge lumora-badge-accent hidden sm:inline-flex">Admin Console</a>
+            <?php endif; ?>
+            <button type="button" class="lumora-btn lumora-btn-ghost" data-lumora-theme-toggle aria-label="Toggle color theme" title="Toggle light/dark theme">
+                <span data-theme-icon="sun" aria-hidden="true">Light</span>
+                <span data-theme-icon="moon" aria-hidden="true">Dark</span>
+            </button>
+            <a href="<?= e(u('/contact/')) ?>" class="lumora-btn lumora-btn-primary hidden sm:inline-flex" data-lumora-cta="header-contact">Contact</a>
+            <button type="button" class="lumora-btn lumora-btn-secondary md:hidden" data-lumora-nav-toggle aria-expanded="false" aria-controls="lumora-mobile-drawer" aria-label="Open navigation menu">Menu</button>
+        </div>
+    </div>
 </header>
+<dialog id="lumora-mobile-drawer" data-lumora-nav-drawer aria-label="Mobile Navigation">
+    <div data-lumora-nav-sheet class="flex flex-col gap-4">
+        <div class="flex items-center justify-between pb-3 border-b border-[var(--lumora-border)]">
+            <span class="font-bold text-sm"><?= e($brandName) ?></span>
+            <button type="button" class="lumora-btn lumora-btn-ghost" data-lumora-nav-close aria-label="Close navigation menu">Close</button>
+        </div>
+        <nav class="flex flex-col gap-1" aria-label="Mobile Primary Navigation">
+            <a href="<?= e(u('/')) ?>" class="lumora-nav-link" <?= $cleanCurrent === '/' ? 'aria-current="page"' : '' ?>>Overview</a>
+            <a href="<?= e(u('/contact/')) ?>" class="lumora-nav-link" <?= str_starts_with($cleanCurrent, '/contact/') ? 'aria-current="page"' : '' ?>>Contact</a>
+            <?php if (!empty($legalSlugs)): ?>
+                <a href="<?= e(u('/legal/')) ?>" class="lumora-nav-link" <?= str_starts_with($cleanCurrent, '/legal/') ? 'aria-current="page"' : '' ?>>Legal</a>
+            <?php endif; ?>
+            <?php if ($showAdmin): ?>
+                <a href="<?= e($adminHref) ?>" class="lumora-nav-link">Admin Console</a>
+            <?php endif; ?>
+        </nav>
+    </div>
+</dialog>
 `,
     "templates/layout/footer.php": `<?php
 declare(strict_types=1);
@@ -322,9 +640,26 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
     http_response_code(403);
     exit('Forbidden');
 }
+
+use Lumora\\Core\\AdminDb;
+use Lumora\\Core\\LegalRegistry;
+use Lumora\\Core\\Security;
+
+$legalSlugs = LegalRegistry::activeSlugs($config ?? [], $GLOBALS['lumoraRootDir'] ?? null);
+$showAdmin = Security::isLocalhost() && !empty($config['features']['admin_panel']);
 ?>
-<footer>
-    <p>&copy; <?= gmdate('Y') ?> <?= e($config['brand']['legal_entity'] ?? ($config['brand']['name'] ?? 'Lumora')) ?>.</p>
+<footer class="mt-auto border-t border-[var(--lumora-border)] bg-[var(--lumora-surface)]">
+    <div class="lumora-container py-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-sm text-[var(--lumora-fg-muted)]">
+        <p>&copy; <?= gmdate('Y') ?> <?= e($config['brand']['legal_entity'] ?? ($config['brand']['name'] ?? 'Lumora')) ?>.</p>
+        <div class="flex flex-wrap items-center gap-4">
+            <?php foreach ($legalSlugs as $legalSlug): ?>
+                <a href="<?= e(u('/legal/' . $legalSlug . '/')) ?>" class="hover:underline"><?= e(ucwords(str_replace('-', ' ', $legalSlug))) ?></a>
+            <?php endforeach; ?>
+            <?php if ($showAdmin): ?>
+                <a href="<?= e(u(AdminDb::normalizeAdminPath($config ?? []))) ?>" class="lumora-badge lumora-badge-accent">Admin Console</a>
+            <?php endif; ?>
+        </div>
+    </div>
 </footer>
 <?= lumora_core_script() ?>
 </body>
@@ -337,11 +672,18 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
     exit('Forbidden');
 }
 component('layout/head', ['meta' => $meta ?? [], 'config' => $config ?? []]);
-component('layout/header', ['config' => $config ?? []]);
+component('layout/header', ['meta' => $meta ?? [], 'config' => $config ?? []]);
 ?>
-<main id="main-content">
-    <h1><?= e($config['brand']['name'] ?? 'Lumora') ?></h1>
-    <p><?= e($config['brand']['slogan'] ?? '') ?></p>
+<main id="main-content" class="lumora-container py-14 flex-1 space-y-8">
+    <section class="lumora-card p-8 sm:p-12 space-y-5">
+        <span class="lumora-badge lumora-badge-accent font-mono">v<?= e($config['brand']['version'] ?? '${pkgVersion}') ?></span>
+        <h1 class="text-3xl sm:text-5xl font-bold tracking-tight"><?= e($config['brand']['name'] ?? 'Lumora') ?></h1>
+        <p class="text-base sm:text-lg text-[var(--lumora-fg-muted)] max-w-2xl"><?= e($config['brand']['slogan'] ?? '') ?></p>
+        <div class="flex flex-wrap gap-3 pt-2">
+            <a href="<?= e(u('/contact/')) ?>" class="lumora-btn lumora-btn-primary" data-lumora-cta="hero-contact">Contact Us</a>
+            <a href="<?= e(u('/legal/')) ?>" class="lumora-btn lumora-btn-secondary">Legal &amp; Policies</a>
+        </div>
+    </section>
 </main>
 <?php component('layout/footer', ['config' => $config ?? []]); ?>
 `,
@@ -352,29 +694,91 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
     exit('Forbidden');
 }
 $inquiry = lumora_handle_inquiry();
+$old = is_array($inquiry['data'] ?? null) ? $inquiry['data'] : [];
+$fieldErrors = is_array($inquiry['field_errors'] ?? null) ? $inquiry['field_errors'] : [];
 component('layout/head', ['meta' => $meta ?? [], 'config' => $config ?? []]);
-component('layout/header', ['config' => $config ?? []]);
+component('layout/header', ['meta' => $meta ?? [], 'config' => $config ?? []]);
 ?>
-<main id="main-content">
-    <h1><?= e($inquiry['channel_meta']['heading'] ?? 'Contact Us') ?></h1>
+<main id="main-content" class="lumora-container py-12 flex-1 max-w-2xl space-y-6">
+    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight"><?= e($inquiry['channel_meta']['heading'] ?? 'Contact Us') ?></h1>
     <?php if (!empty($inquiry['success'])): ?>
-        <div role="status">Receipt: <strong><?= e($inquiry['receipt'] ?? '') ?></strong></div>
+        <div class="lumora-alert-success" role="status" aria-live="polite">
+            Receipt: <strong><?= e($inquiry['receipt'] ?? '') ?></strong>
+        </div>
     <?php else: ?>
-        <form method="POST" action="<?= e(u('/contact/')) ?>" data-lumora-contact-form>
+        <?php if (!empty($inquiry['errors'])): ?>
+            <div class="lumora-alert-danger" role="alert">
+                <ul class="list-disc pl-5 text-sm space-y-1">
+                    <?php foreach ($inquiry['errors'] as $err): ?>
+                        <li><?= e((string)$err) ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        <?php endif; ?>
+        <form method="POST" action="<?= e(u('/contact/')) ?>" class="lumora-card p-6 space-y-4" data-lumora-contact-form novalidate>
             <input type="hidden" name="_csrf" value="<?= e(lumora_csrf_token()) ?>" />
             <input type="hidden" name="_ts" value="<?= (string)time() ?>" />
             <input type="hidden" name="channel" value="<?= e($inquiry['channel'] ?? 'general') ?>" />
             <div class="lumora-honeypot" aria-hidden="true">
                 <label>Website <input type="text" name="website_url" tabindex="-1" autocomplete="off" /></label>
             </div>
-            <label>Full Name <input type="text" name="name" required /></label>
-            <label>Email <input type="email" name="email" required /></label>
-            <label>Subject <input type="text" name="subject" required /></label>
-            <label>Message <textarea name="message" minlength="15" maxlength="4000" required></textarea></label>
-            <label><input type="checkbox" name="consent" value="1" required /> I acknowledge the Privacy Notice.</label>
-            <button type="submit"><?= e($inquiry['channel_meta']['button_text'] ?? 'Send') ?></button>
+            <div>
+                <label for="name" class="block text-sm font-medium mb-1">Full Name *</label>
+                <input id="name" type="text" name="name" value="<?= e((string)($old['name'] ?? '')) ?>" required class="lumora-input" data-error="err-name" aria-invalid="<?= isset($fieldErrors['name']) ? 'true' : 'false' ?>" />
+                <p id="err-name" class="lumora-field-error"><?= e((string)($fieldErrors['name'] ?? '')) ?></p>
+            </div>
+            <div>
+                <label for="email" class="block text-sm font-medium mb-1">Email *</label>
+                <input id="email" type="email" name="email" value="<?= e((string)($old['email'] ?? '')) ?>" required class="lumora-input" data-error="err-email" aria-invalid="<?= isset($fieldErrors['email']) ? 'true' : 'false' ?>" />
+                <p id="err-email" class="lumora-field-error"><?= e((string)($fieldErrors['email'] ?? '')) ?></p>
+            </div>
+            <div>
+                <label for="subject" class="block text-sm font-medium mb-1">Subject *</label>
+                <input id="subject" type="text" name="subject" value="<?= e((string)($old['subject'] ?? '')) ?>" required class="lumora-input" data-error="err-subject" aria-invalid="<?= isset($fieldErrors['subject']) ? 'true' : 'false' ?>" />
+                <p id="err-subject" class="lumora-field-error"><?= e((string)($fieldErrors['subject'] ?? '')) ?></p>
+            </div>
+            <div>
+                <label for="message" class="block text-sm font-medium mb-1">Message *</label>
+                <textarea id="message" name="message" rows="4" minlength="15" maxlength="4000" required class="lumora-textarea" data-error="err-message" aria-invalid="<?= isset($fieldErrors['message']) ? 'true' : 'false' ?>"><?= e((string)($old['message'] ?? '')) ?></textarea>
+                <p id="err-message" class="lumora-field-error"><?= e((string)($fieldErrors['message'] ?? '')) ?></p>
+            </div>
+            <div>
+                <label class="inline-flex items-center gap-2 text-sm">
+                    <input id="consent" type="checkbox" name="consent" value="1" required data-error="err-consent" aria-invalid="<?= isset($fieldErrors['consent']) ? 'true' : 'false' ?>" />
+                    <span>I acknowledge the Privacy Notice. *</span>
+                </label>
+                <p id="err-consent" class="lumora-field-error"><?= e((string)($fieldErrors['consent'] ?? '')) ?></p>
+            </div>
+            <button type="submit" class="lumora-btn lumora-btn-primary"><?= e($inquiry['channel_meta']['button_text'] ?? 'Send') ?></button>
         </form>
     <?php endif; ?>
+</main>
+<?php component('layout/footer', ['config' => $config ?? []]); ?>
+`,
+    "templates/legal-index.php": `<?php
+declare(strict_types=1);
+if (!defined('LUMORA_BOOTSTRAPPED')) {
+    http_response_code(403);
+    exit('Forbidden');
+}
+use Lumora\\Core\\LegalRegistry;
+$slugs = LegalRegistry::activeSlugs($config ?? [], $GLOBALS['lumoraRootDir'] ?? null);
+component('layout/head', ['meta' => $meta ?? [], 'config' => $config ?? []]);
+component('layout/header', ['meta' => $meta ?? [], 'config' => $config ?? []]);
+?>
+<main id="main-content" class="lumora-container py-12 flex-1 space-y-6">
+    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Legal &amp; Governance</h1>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <?php foreach ($slugs as $s): ?>
+            <?php $doc = LegalRegistry::resolveDocument($s, $config ?? [], $GLOBALS['lumoraRootDir'] ?? null); ?>
+            <?php if ($doc !== null): ?>
+                <article class="lumora-card p-6 space-y-2">
+                    <h2 class="text-lg font-bold"><a href="<?= e(u('/legal/' . $s . '/')) ?>" class="hover:underline"><?= e((string)($doc['title'] ?? ucfirst($s))) ?></a></h2>
+                    <p class="text-sm text-[var(--lumora-fg-muted)]"><?= e((string)($doc['lead'] ?? '')) ?></p>
+                </article>
+            <?php endif; ?>
+        <?php endforeach; ?>
+    </div>
 </main>
 <?php component('layout/footer', ['config' => $config ?? []]); ?>
 `,
@@ -385,17 +789,19 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
     exit('Forbidden');
 }
 component('layout/head', ['meta' => $meta ?? [], 'config' => $config ?? []]);
-component('layout/header', ['config' => $config ?? []]);
+component('layout/header', ['meta' => $meta ?? [], 'config' => $config ?? []]);
 ?>
-<main id="main-content">
-    <h1><?= e($legal_data['title'] ?? 'Legal Policy') ?></h1>
-    <p><?= e($legal_data['lead'] ?? '') ?></p>
-    <?php foreach ($legal_data['sections'] ?? [] as $section): ?>
-        <section id="<?= e($section['id'] ?? '') ?>">
-            <h2><?= e($section['title'] ?? '') ?></h2>
-            <div><?= $section['body'] ?? '' ?></div>
-        </section>
-    <?php endforeach; ?>
+<main id="main-content" class="lumora-container py-12 flex-1 max-w-3xl">
+    <article class="lumora-card p-6 sm:p-10 space-y-6">
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight"><?= e($legal_data['title'] ?? 'Legal Policy') ?></h1>
+        <p class="text-[var(--lumora-fg-muted)]"><?= e($legal_data['lead'] ?? '') ?></p>
+        <?php foreach ($legal_data['sections'] ?? [] as $section): ?>
+            <section id="<?= e($section['id'] ?? '') ?>" class="space-y-2">
+                <h2 class="text-lg font-bold"><?= e($section['title'] ?? '') ?></h2>
+                <div class="text-sm text-[var(--lumora-fg-muted)] space-y-2"><?= $section['body'] ?? '' ?></div>
+            </section>
+        <?php endforeach; ?>
+    </article>
 </main>
 <?php component('layout/footer', ['config' => $config ?? []]); ?>
 `,
@@ -406,11 +812,13 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
     exit('Forbidden');
 }
 component('layout/head', ['meta' => $meta ?? [], 'config' => $config ?? []]);
-component('layout/header', ['config' => $config ?? []]);
+component('layout/header', ['meta' => $meta ?? [], 'config' => $config ?? []]);
 ?>
-<main id="main-content">
-    <h1>404 — Page Not Found</h1>
-    <p><a href="<?= e(u('/')) ?>">Return Home</a></p>
+<main id="main-content" class="lumora-container py-16 flex-1">
+    <div class="lumora-card p-8 max-w-md mx-auto text-center space-y-4">
+        <h1 class="text-2xl font-bold">404 — Page Not Found</h1>
+        <a href="<?= e(u('/')) ?>" class="lumora-btn lumora-btn-primary">Return Home</a>
+    </div>
 </main>
 <?php component('layout/footer', ['config' => $config ?? []]); ?>
 `,
@@ -448,6 +856,7 @@ component('layout/header', ['config' => $config ?? []]);
     build: "lumora-web build",
     verify: "lumora-web verify",
     flush: "lumora-web flush",
+    admin: "lumora-web admin",
     ...existingScripts,
   };
   const existingDeps = (pkgObj.dependencies as Record<string, string> | undefined) ?? {};
@@ -521,10 +930,11 @@ component('layout/header', ['config' => $config ?? []]);
 
 - \`bun run sync\`: Materialize \`core/*.php\` and \`public/assets/js/lumora-core.js\` and update \`lumora-lock.json\`
 - \`bun run css\`: Compile Tailwind CSS v4 into \`public/assets/css/lumora.min.css\`
-- \`bun run dev\`: Start local PHP 8.2+ dev server and CSS watcher
+- \`bun run dev\`: Start local PHP 8.2+ dev server, CSS/template watcher, and localhost Admin Console setup helper
 - \`bun run build\`: Build zero-dependency \`dist/\` deployment bundle
 - \`bun run verify\`: Run the 12-Gate Automated Compliance Verifier
 - \`bun run flush\`: Replay pending SQLite WAL outbox inquiries to Hub
+- \`bun run admin\`: Manage Admin Console users (\`create-user\`, \`list-users\`, \`reset-password\`)
 
 ## AI Agent Context
 

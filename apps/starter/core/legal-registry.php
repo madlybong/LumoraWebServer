@@ -51,6 +51,20 @@ final class LegalRegistry
                     $slugs[] = $slug;
                 }
             }
+            $pdo = class_exists(AdminDb::class, false) ? AdminDb::connectExisting($resolvedRoot) : null;
+            if ($pdo instanceof \PDO) {
+                try {
+                    $rows = $pdo->query('SELECT slug FROM cms_legal_overrides WHERE is_active = 1')->fetchAll(\PDO::FETCH_ASSOC);
+                    foreach ($rows as $row) {
+                        $s = strtolower(trim((string)($row['slug'] ?? '')));
+                        if ($s !== '' && preg_match('/^[a-z0-9-]+$/', $s)) {
+                            $slugs[] = $s;
+                        }
+                    }
+                } catch (\Throwable) {
+                    // Ignore if table absent
+                }
+            }
             return array_values(array_unique($slugs));
         }
 
@@ -64,6 +78,21 @@ final class LegalRegistry
                 if ($slug !== 'index' && preg_match('/^[a-z0-9-]+$/', $slug)) {
                     $discovered[] = $slug;
                 }
+            }
+        }
+
+        $pdo = class_exists(AdminDb::class, false) ? AdminDb::connectExisting($resolvedRoot) : null;
+        if ($pdo instanceof \PDO) {
+            try {
+                $rows = $pdo->query('SELECT slug FROM cms_legal_overrides WHERE is_active = 1')->fetchAll(\PDO::FETCH_ASSOC);
+                foreach ($rows as $row) {
+                    $s = strtolower(trim((string)($row['slug'] ?? '')));
+                    if ($s !== '' && preg_match('/^[a-z0-9-]+$/', $s)) {
+                        $discovered[] = $s;
+                    }
+                }
+            } catch (\Throwable) {
+                // Ignore if table absent
             }
         }
 
@@ -150,6 +179,33 @@ final class LegalRegistry
             str_replace('\\', '/', $rootDir ?? (string)($GLOBALS['lumoraRootDir'] ?? getcwd())),
             '/'
         );
+
+        // Runtime SQLite legal override (highest priority when active)
+        $pdo = class_exists(AdminDb::class, false) ? AdminDb::connectExisting($resolvedRoot) : null;
+        if ($pdo instanceof \PDO) {
+            try {
+                $stmt = $pdo->prepare('SELECT * FROM cms_legal_overrides WHERE slug = :s AND is_active = 1 LIMIT 1');
+                $stmt->execute([':s' => $slug]);
+                $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                if (is_array($row)) {
+                    $neutralMeta = self::buildNeutralMeta($slug, $config);
+                    $sections = json_decode((string)($row['sections_json'] ?? '[]'), true);
+                    return array_merge($neutralMeta, [
+                        'doc_no'        => (string)(($row['doc_no'] ?? '') !== '' ? $row['doc_no'] : $neutralMeta['doc_no']),
+                        'title'         => (string)($row['title'] ?? $neutralMeta['title']),
+                        'lead'          => (string)($row['lead'] ?? ''),
+                        'version'       => (string)(($row['version'] ?? '') !== '' ? $row['version'] : $neutralMeta['version']),
+                        'date'          => (string)(($row['date'] ?? '') !== '' ? $row['date'] : $neutralMeta['date']),
+                        'status'        => (string)(($row['status'] ?? '') !== '' ? $row['status'] : $neutralMeta['status']),
+                        'sections'      => is_array($sections) ? $sections : [],
+                        'source_origin' => 'sqlite',
+                    ]);
+                }
+            } catch (\Throwable) {
+                // Fallback to file / territory template
+            }
+        }
+
         $overrideFile = $resolvedRoot . '/content/legal/' . $slug . '.php';
         $active = self::activeSlugs($config, $resolvedRoot);
 

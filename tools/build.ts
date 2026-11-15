@@ -1,4 +1,4 @@
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { buildWebsiteDist } from "../packages/core/src/cli/build-dist";
 
@@ -55,8 +55,39 @@ if (coreCode !== 0) {
 const binJsPath = path.join(coreDir, "dist", "bin", "lumora-web.js");
 writeFileSync(binJsPath, readFileSync(binJsPath, "utf8").replace(/\r\n/g, "\n"), "utf8");
 
-// 2. Build apps/starter dist/ bundle
+// 2. Build packages/admin (AOT compiled Vue 3 + shadcn-vue + Tailwind v4 runtime assets)
+const adminDir = path.join(rootDir, "packages/admin");
+const viteNames = process.platform === "win32" ? ["vite.exe", "vite.cmd"] : ["vite"];
+const viteCandidates = [adminDir, rootDir].flatMap((base) =>
+  viteNames.map((bin) => path.join(base, "node_modules", ".bin", bin))
+);
+const viteBin = viteCandidates.find((candidate) => existsSync(candidate));
+if (!viteBin) {
+  console.error(`Unable to locate Vite binary in:\n${viteCandidates.join("\n")}`);
+  process.exit(1);
+}
+const adminBuild = Bun.spawn([viteBin, "build"], {
+  cwd: adminDir,
+  stdout: "inherit",
+  stderr: "inherit",
+});
+const adminCode = await adminBuild.exited;
+if (adminCode !== 0) {
+  process.exit(adminCode);
+}
+
+// Verify Gate 05 & Gate 06 compliance on compiled admin bundle
+const compiledAdminJs = readFileSync(path.join(coreDir, "runtime/admin/lumora-admin.js"), "utf8");
+const compiledAdminCss = readFileSync(path.join(coreDir, "runtime/admin/lumora-admin.css"), "utf8");
+for (const forbidden of [/\beval\s*\(/, /new\s+Function\s*\(/, /fonts\.googleapis\.com/i, /unpkg\.com|cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com/i]) {
+  if (forbidden.test(compiledAdminJs) || forbidden.test(compiledAdminCss)) {
+    console.error(`Gate 05 violation in compiled admin bundle (${forbidden})`);
+    process.exit(1);
+  }
+}
+
+// 3. Build apps/starter dist/ bundle
 const starterDir = path.join(rootDir, "apps/starter");
 await buildWebsiteDist({ cwd: starterDir });
 
-console.log("Built 2 projects (packages/core + apps/starter).");
+console.log("Built 3 projects (packages/core + packages/admin + apps/starter).");

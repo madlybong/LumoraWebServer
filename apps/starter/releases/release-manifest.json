@@ -1,0 +1,18 @@
+{
+    "product": "Lumora WebStarter",
+    "legalOwner": "Lumora Maintainers",
+    "domain": "lumora-starter.example.com",
+    "version": "0.2.0",
+    "installerMode": "offline-only",
+    "artifacts": [
+        {
+            "version": "0.2.0",
+            "platform": "cross-platform",
+            "filename": "lumora-starter-v0.2.0-reference.tar.gz",
+            "sha256": "a058db672aa76a4639a19bb1263aaf4355e3e6e081eb228c0ea54422c7f69328",
+            "size_bytes": 205,
+            "channel": "stable",
+            "release_notes": "Reference starter bundle (README + release notes) demonstrating SHA-256 release verification and HTTP byte-range delivery."
+        }
+    ]
+}

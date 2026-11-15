@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-label="Lumora WebServer Architecture Overview">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#09090b"/>
+      <stop offset="55%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M 48 0 L 0 0 0 48" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  <g transform="translate(88, 108)">
+    <rect x="0" y="0" width="72" height="72" rx="16" fill="#2563eb"/>
+    <path d="M22 18h11v27h19v9H22V18z" fill="#ffffff"/>
+    <text x="96" y="34" fill="#93c5fd" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" font-weight="600">@ASTRAKE/LUMORA-WEBSERVER</text>
+    <text x="96" y="62" fill="#e4e4e7" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="500">Headless PHP 8.2+ Micro-Kernel &amp; Tailwind CSS v4</text>
+  </g>
+  <g transform="translate(88, 250)">
+    <rect x="0" y="0" width="318" height="236" rx="16" fill="rgba(24,24,27,0.86)" stroke="rgba(255,255,255,0.14)"/>
+    <text x="28" y="48" fill="#60a5fa" font-family="ui-monospace, monospace" font-size="15" font-weight="700">01 / SECURITY BOUNDARY</text>
+    <text x="28" y="92" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700">CSP Nonce + SHA-384 SRI</text>
+    <text x="28" y="132" fill="#a1a1aa" font-family="system-ui, -apple-system, sans-serif" font-size="17">Strict zero-eval policy headers,</text>
+    <text x="28" y="158" fill="#a1a1aa" font-family="system-ui, -apple-system, sans-serif" font-size="17">HMAC-SHA256 stateless v2 CSRF,</text>
+    <text x="28" y="184" fill="#a1a1aa" font-family="system-ui, -apple-system, sans-serif" font-size="17">and isolated storage vault.</text>
+  </g>
+  <g transform="translate(441, 250)">
+    <rect x="0" y="0" width="318" height="236" rx="16" fill="rgba(24,24,27,0.86)" stroke="rgba(255,255,255,0.14)"/>
+    <text x="28" y="48" fill="#60a5fa" font-family="ui-monospace, monospace" font-size="15" font-weight="700">02 / HYBRID CONTENT</text>
+    <text x="28" y="92" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700">SQLite WAL + Flat Files</text>
+    <text x="28" y="132" fill="#a1a1aa" font-family="system-ui, -apple-system, sans-serif" font-size="17">Docs tracks, Blog + Atom feed,</text>
+    <text x="28" y="158" fill="#a1a1aa" font-family="system-ui, -apple-system, sans-serif" font-size="17">SHA-256 releases, and RBAC</text>
+    <text x="28" y="184" fill="#a1a1aa" font-family="system-ui, -apple-system, sans-serif" font-size="17">Admin Console in one kernel.</text>
+  </g>
+  <g transform="translate(794, 250)">
+    <rect x="0" y="0" width="318" height="236" rx="16" fill="rgba(24,24,27,0.86)" stroke="rgba(255,255,255,0.14)"/>
+    <text x="28" y="48" fill="#60a5fa" font-family="ui-monospace, monospace" font-size="15" font-weight="700">03 / ZERO-REWRITE DIST</text>
+    <text x="28" y="92" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700">12-Gate Verified Build</text>
+    <text x="28" y="132" fill="#a1a1aa" font-family="system-ui, -apple-system, sans-serif" font-size="17">Compiled Tailwind v4 styles,</text>
+    <text x="28" y="158" fill="#a1a1aa" font-family="system-ui, -apple-system, sans-serif" font-size="17">deterministic route stubs, and</text>
+    <text x="28" y="184" fill="#a1a1aa" font-family="system-ui, -apple-system, sans-serif" font-size="17">ephemeral HTTP verification.</text>
+  </g>
+</svg>

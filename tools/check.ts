@@ -3,6 +3,7 @@ import path from "node:path";
 const projects = [
   "packages/core/tsconfig.json",
   "packages/core/tsconfig.strict.json",
+  "packages/admin/tsconfig.json",
   "apps/starter/tsconfig.json",
 ];
 

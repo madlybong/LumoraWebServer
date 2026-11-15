@@ -36,29 +36,24 @@ export async function compileBrandCss(options: CssCompileOptions = {}): Promise<
     .replace(/@import\s+["'][^"']*lumora-base\.css["']\s*;/g, "")
     .replace(/@import\s+["'][^"']*brand-theme\.css["']\s*;/g, "");
 
-  const combinedInput = `${baseCssContent}\n${themeCssContent}\n${brandCssContent}\n`;
+  // Scope Tailwind v4 utility scanning strictly to the website's templates, content, and css directories
+  // so dist/ artifacts and admin assets are never scanned into the site stylesheet.
+  const combinedInput = `${baseCssContent}\n${themeCssContent}\n${brandCssContent}\n`.replace(
+    /@import\s+["']tailwindcss["']\s*;/g,
+    '@import "tailwindcss" source(none);\n@source "../templates";\n@source "../content";\n@source "../css";'
+  );
   const tempInputPath = path.join(siteRoot, "css", ".lumora-combined-build.css");
   mkdirSync(path.dirname(tempInputPath), { recursive: true });
   writeFileSync(tempInputPath, combinedInput, "utf8");
 
   try {
-    const tailwindCliCandidates = [
-      path.join(siteRoot, "node_modules", ".bin", process.platform === "win32" ? "tailwindcss.cmd" : "tailwindcss"),
-      path.join(
-        resolvePackageRoot(),
-        "node_modules",
-        ".bin",
-        process.platform === "win32" ? "tailwindcss.cmd" : "tailwindcss"
-      ),
-      path.join(
-        resolvePackageRoot(),
-        "..",
-        "..",
-        "node_modules",
-        ".bin",
-        process.platform === "win32" ? "tailwindcss.cmd" : "tailwindcss"
-      ),
+    const binNames = process.platform === "win32" ? ["tailwindcss.exe", "tailwindcss.cmd"] : ["tailwindcss"];
+    const binDirs = [
+      path.join(siteRoot, "node_modules", ".bin"),
+      path.join(resolvePackageRoot(), "node_modules", ".bin"),
+      path.join(resolvePackageRoot(), "..", "..", "node_modules", ".bin"),
     ];
+    const tailwindCliCandidates = binDirs.flatMap((dir) => binNames.map((bin) => path.join(dir, bin)));
 
     const cliBin = tailwindCliCandidates.find((c) => existsSync(c));
     let compiledSuccessfully = false;
@@ -68,8 +63,9 @@ export async function compileBrandCss(options: CssCompileOptions = {}): Promise<
       if (options.minify !== false) {
         args.push("--minify");
       }
+      const isCmdShim = process.platform === "win32" && cliBin.toLowerCase().endsWith(".cmd");
       const proc = Bun.spawnSync(
-        process.platform === "win32" ? ["cmd.exe", "/c", cliBin, ...args] : [cliBin, ...args],
+        isCmdShim ? ["cmd.exe", "/c", cliBin, ...args] : [cliBin, ...args],
         {
           cwd: siteRoot,
           stdout: "pipe",

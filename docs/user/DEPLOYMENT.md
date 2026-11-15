@@ -17,9 +17,9 @@ The generated `dist/` directory contains:
 - `index.php`, `lumora.config.php`, `lumora-lock.json`
 - `.htaccess` (Apache / LiteSpeed / cPanel rules)
 - `nginx.lumora.conf` (Nginx / aaPanel snippet)
-- `core/*.php` (All 13 headless PHP 8.2+ modules)
-- `templates/`, `content/`, `public/`, `storage/` (with `403` `index.php` and `.htaccess` guards)
-- Physical `<route>/index.php` stubs for every canonical route, statutory `/legal/{slug}/` route, `/docs/` article, `/blog/` article, and `301` redirect
+- `core/*.php` (All 17 headless PHP 8.2+ modules)
+- `templates/`, `content/`, `public/` (including `public/assets/admin/` & non-executable `public/uploads/.htaccess` when `features.admin_panel` is `true`), `storage/` (with `403` `index.php` and `.htaccess` guards)
+- Physical `<route>/index.php` stubs for every canonical route, statutory `/legal/{slug}/` route, `/docs/` article, `/blog/` article, `301` redirect, and (when enabled) `<admin.path>/index.php` + `<admin.path>/api/index.php`
 
 ---
 

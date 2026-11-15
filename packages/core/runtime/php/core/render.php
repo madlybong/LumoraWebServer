@@ -72,13 +72,19 @@ final class Render
     {
         $resolvedRoot = $rootDir ?? (self::$rootDir !== '' ? self::$rootDir : (string)($GLOBALS['lumoraRootDir'] ?? getcwd()));
         $cleanName = preg_replace('/[^a-z0-9_\/-]/', '', strtolower($name)) ?? '';
-        $cleanName = str_replace('..', '', $cleanName);
+        $cleanName = trim(str_replace('..', '', $cleanName), '/');
+        if ($cleanName === '') {
+            return;
+        }
 
-        $candidates = [
-            $resolvedRoot . '/templates/components/' . $cleanName . '.php',
-            $resolvedRoot . '/templates/layout/' . $cleanName . '.php',
-            $resolvedRoot . '/includes/components/' . $cleanName . '.php',
-        ];
+        $candidates = [];
+        if (str_contains($cleanName, '/')) {
+            $candidates[] = $resolvedRoot . '/templates/' . $cleanName . '.php';
+        }
+        $candidates[] = $resolvedRoot . '/templates/components/' . $cleanName . '.php';
+        $candidates[] = $resolvedRoot . '/templates/layout/' . $cleanName . '.php';
+        $candidates[] = $resolvedRoot . '/includes/components/' . $cleanName . '.php';
+
         foreach ($candidates as $file) {
             if (is_file($file)) {
                 extract($props, EXTR_SKIP);
@@ -158,12 +164,12 @@ final class Render
             "<link rel=\"alternate\" hreflang=\"x-default\" href=\"{$eCanonical}\" />",
         ];
 
-        $rootForDisc = self::$rootDir !== '' ? self::$rootDir : (string)($GLOBALS['lumoraRootDir'] ?? '');
-        if (Discovery::isEndpointEnabled('llms_txt', $config, $rootForDisc)) {
+        $rootForDisc = $resolvedRoot !== '' ? $resolvedRoot : (string)($GLOBALS['lumoraRootDir'] ?? '');
+        if (Discovery::isEndpointEnabled('llms_txt', $cfg, $rootForDisc)) {
             $lines[] = "<link rel=\"alternate\" type=\"text/plain\" title=\"AI Context Manifest\" href=\"{$origin}/llms.txt\" />";
             $lines[] = "<link rel=\"alternate\" type=\"text/plain\" title=\"AI Full Knowledge Specification\" href=\"{$origin}/llms-full.txt\" />";
         }
-        if (Discovery::isEndpointEnabled('webmanifest', $config, $rootForDisc)) {
+        if (Discovery::isEndpointEnabled('webmanifest', $cfg, $rootForDisc)) {
             $lines[] = "<link rel=\"manifest\" href=\"" . self::escape(self::assetUrl('/site.webmanifest')) . "\" />";
         }
 

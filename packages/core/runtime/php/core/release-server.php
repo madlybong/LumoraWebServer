@@ -13,29 +13,107 @@ if (!defined('LUMORA_BOOTSTRAPPED')) {
  */
 final class ReleaseServer
 {
+    /**
+     * Returns merged file + SQLite release manifest data and enriched artifacts list.
+     *
+     * @return array<string, mixed>
+     */
+    public static function getCatalog(array $config, string $rootDir): array
+    {
+        $releasesDir = getenv('LUMORA_RELEASES_DIR') ?: ($rootDir . '/releases');
+        $brand = $config['brand'] ?? [];
+
+        $manifestFile = $releasesDir . '/release-manifest.json';
+        $manifest = [
+            'product'       => (string)($brand['name'] ?? 'Lumora'),
+            'legalOwner'    => (string)($brand['legal_entity'] ?? $brand['name'] ?? 'Lumora'),
+            'domain'        => (string)($brand['domain'] ?? 'localhost'),
+            'version'       => (string)($brand['version'] ?? '0.1.0'),
+            'installerMode' => 'offline-only',
+            'artifacts'     => [],
+        ];
+        if (is_file($manifestFile)) {
+            $decoded = json_decode((string)@file_get_contents($manifestFile), true);
+            if (is_array($decoded)) {
+                $manifest = array_merge($manifest, $decoded);
+            }
+        }
+
+        $byFile = [];
+        foreach (($manifest['artifacts'] ?? []) as $art) {
+            if (!is_array($art) || empty($art['filename'])) {
+                continue;
+            }
+            $fn = (string)$art['filename'];
+            $art['source_origin'] = (string)($art['source_origin'] ?? 'file');
+            $diskPath = $releasesDir . '/' . basename($fn);
+            if (is_file($diskPath)) {
+                if (empty($art['size_bytes'])) {
+                    $art['size_bytes'] = (int)filesize($diskPath);
+                }
+                if (empty($art['sha256'])) {
+                    $art['sha256'] = (string)hash_file('sha256', $diskPath);
+                }
+                $art['available'] = true;
+            } else {
+                $art['available'] = false;
+            }
+            $byFile[$fn] = $art;
+        }
+
+        $pdo = class_exists(AdminDb::class, false) ? AdminDb::connectExisting($rootDir) : null;
+        if ($pdo instanceof \PDO) {
+            try {
+                $rows = $pdo->query('SELECT * FROM cms_releases WHERE is_active = 1 ORDER BY id DESC')->fetchAll(\PDO::FETCH_ASSOC);
+                foreach ($rows as $row) {
+                    $fn = (string)($row['filename'] ?? '');
+                    if ($fn === '') {
+                        continue;
+                    }
+                    $diskPath = $releasesDir . '/' . basename($fn);
+                    $onDisk = is_file($diskPath);
+                    $sizeBytes = (int)($row['size_bytes'] ?? 0);
+                    $sha256 = (string)($row['sha256'] ?? '');
+                    if ($onDisk) {
+                        if ($sizeBytes <= 0) {
+                            $sizeBytes = (int)filesize($diskPath);
+                        }
+                        if ($sha256 === '') {
+                            $sha256 = (string)hash_file('sha256', $diskPath);
+                        }
+                    }
+                    $byFile[$fn] = [
+                        'version'       => (string)($row['version'] ?? ''),
+                        'platform'      => (string)($row['platform'] ?? 'archive'),
+                        'filename'      => $fn,
+                        'sha256'        => $sha256,
+                        'size_bytes'    => $sizeBytes,
+                        'channel'       => (string)($row['channel'] ?? 'stable'),
+                        'release_notes' => (string)($row['release_notes'] ?? ''),
+                        'source_origin' => 'sqlite',
+                        'available'     => $onDisk,
+                    ];
+                }
+            } catch (\Throwable) {
+                // Fallback cleanly to file manifest
+            }
+        }
+
+        $manifest['artifacts'] = array_values($byFile);
+        return $manifest;
+    }
+
     public static function tryServe(string $path, array $config, string $rootDir): bool
     {
-        if (!str_starts_with($path, '/releases/')) {
+        if (!str_starts_with($path, '/releases/') || $path === '/releases/') {
             return false;
         }
 
         $releasesDir = getenv('LUMORA_RELEASES_DIR') ?: ($rootDir . '/releases');
-        $brand = $config['brand'] ?? [];
 
         if ($path === '/releases/release-manifest.json') {
-            $manifestFile = $releasesDir . '/release-manifest.json';
-            if (is_file($manifestFile)) {
-                $json = (string)@file_get_contents($manifestFile);
-            } else {
-                $json = (string)json_encode([
-                    'product'       => (string)($brand['name'] ?? 'Lumora'),
-                    'legalOwner'    => (string)($brand['legal_entity'] ?? $brand['name'] ?? 'Lumora'),
-                    'domain'        => (string)($brand['domain'] ?? 'localhost'),
-                    'version'       => (string)($brand['version'] ?? '0.1.0'),
-                    'installerMode' => 'offline-only',
-                    'artifacts'     => [],
-                ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
-            }
+            $manifest = self::getCatalog($config, $rootDir);
+            $json = (string)json_encode($manifest, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
             http_response_code(200);
             if (!headers_sent()) {
                 header('Content-Type: application/json; charset=UTF-8');
@@ -47,7 +125,32 @@ final class ReleaseServer
 
         if ($path === '/releases/SHA256SUMS') {
             $sumsFile = $releasesDir . '/SHA256SUMS';
-            $body = is_file($sumsFile) ? (string)@file_get_contents($sumsFile) : '';
+            $linesByFile = [];
+            if (is_file($sumsFile)) {
+                $rawLines = preg_split('/\R/', (string)@file_get_contents($sumsFile)) ?: [];
+                foreach ($rawLines as $line) {
+                    $trim = trim($line);
+                    if ($trim !== '' && preg_match('/^([a-f0-9]{64})\s+\*?(.+)$/i', $trim, $m)) {
+                        $linesByFile[trim($m[2])] = strtolower($m[1]) . '  ' . trim($m[2]);
+                    }
+                }
+            }
+            $pdo = class_exists(AdminDb::class, false) ? AdminDb::connectExisting($rootDir) : null;
+            if ($pdo instanceof \PDO) {
+                try {
+                    $rows = $pdo->query('SELECT sha256, filename FROM cms_releases WHERE is_active = 1 ORDER BY id ASC')->fetchAll(\PDO::FETCH_ASSOC);
+                    foreach ($rows as $row) {
+                        $fn = trim((string)($row['filename'] ?? ''));
+                        $hash = strtolower(trim((string)($row['sha256'] ?? '')));
+                        if ($fn !== '' && preg_match('/^[a-f0-9]{64}$/', $hash) === 1) {
+                            $linesByFile[$fn] = $hash . '  ' . $fn;
+                        }
+                    }
+                } catch (\Throwable) {
+                    // Ignore
+                }
+            }
+            $body = empty($linesByFile) ? '' : (implode("\n", array_values($linesByFile)) . "\n");
             http_response_code(200);
             if (!headers_sent()) {
                 header('Content-Type: text/plain; charset=UTF-8');

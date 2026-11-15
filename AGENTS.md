@@ -16,7 +16,7 @@ This is the authoritative operating guide for AI coding agents working in:
    - Never hardcode brand names, domains, routes, inquiry channels, or legal entity particulars inside `packages/core/runtime/php/core/`.
    - Parameterize 100% of brand data through `lumora.config.php`, `content/routes.php`, `content/channels.php`, and `content/legal/{slug}.php`.
 2. **Read-Only `core/` in Consumer Websites:**
-   - In any brand website consuming `@astrake/lumora-webserver`, files inside `<website>/core/` and `<website>/public/assets/js/lumora-core.js` are managed exclusively by `lumora-web sync` and verified by SHA-256 checksums in `lumora-lock.json` (**Gate 01**). Never hand-edit `<website>/core/*.php` in a consumer repo.
+   - In any brand website consuming `@astrake/lumora-webserver`, files inside `<website>/core/`, `<website>/public/assets/js/lumora-core.js`, and (when `features.admin_panel` is `true`) `<website>/public/assets/admin/lumora-admin.{js,css}` are managed exclusively by `lumora-web sync` and verified by SHA-256/SHA-384 checksums in `lumora-lock.json` (**Gate 01** & **Gate 04**). Never hand-edit synced runtime files in a consumer repo.
 3. **Strict PHP 8.2+ & Direct-Access Guard (`Gate 02` & `Gate 03`):**
    - Every PHP file in the repository (`index.php`, `router.php`, `lumora.config.php`, `core/*.php`, `content/**/*.php`, `templates/**/*.php`) **must** begin with `<?php` and `declare(strict_types=1);`.
    - Every PHP file **except** `index.php` and `router.php` **must** enforce the bootstrap isolation guard at the top of the file:
@@ -100,17 +100,33 @@ When authoring brand templates in `templates/**/*.php`, use these global helper 
 ## 5. CLI & Workspace Commands
 
 ### Inside a Brand Website
-- `bunx lumora-web init [--brand-id <id>] [--brand-name <name>] [--prefix <PFX>] [--domain <domain>] [--entity <entity>] [--with-agents]`
-- `bunx lumora-web sync [--force-stubs] [--with-agents]`
+- `bunx lumora-web init [--brand-id <id>] [--brand-name <name>] [--prefix <PFX>] [--domain <domain>] [--entity <entity>] [--with-agents] [--with-admin]`
+- `bunx lumora-web sync [--force-stubs] [--with-agents] [--with-admin]`
 - `bunx lumora-web css`
 - `bunx lumora-web dev [--port 8080]`
 - `bunx lumora-web build`
 - `bunx lumora-web verify`
 - `bunx lumora-web flush`
+- `bunx lumora-web admin <create-user|list-users|reset-password|disable-2fa|revoke-sessions|hash-password>`
 
-### Inside the `LumoraWebServer` Monorepo
-- `bun run check`: Typecheck all workspace packages (`packages/core`, `apps/starter`).
+---
+
+## 6. Upgrading an Existing Consumer Website (`0.1.x` → `0.2.0`)
+
+1. Install the latest package: `bun add -D @astrake/lumora-webserver@^0.2.0`.
+2. Read `node_modules/@astrake/lumora-webserver/UPGRADING.md` (or `UPGRADING.md` at the repo root if synced).
+3. Run deterministic upgrade sync:
+   - Core-only upgrade (admin disabled): `bunx lumora-web sync --force-stubs --with-agents`
+   - Full upgrade enabling the Admin Console & Hybrid SQLite CMS: `bunx lumora-web sync --with-admin --force-stubs --with-agents`
+4. Rebuild CSS, package `dist/`, and assert all 12 Compliance Gates:
+   - `bunx lumora-web css && bunx lumora-web build && bunx lumora-web verify`
+5. Never hand-edit `core/*.php` (17 modules), `public/assets/js/lumora-core.js`, or `public/assets/admin/*`; `lumora-web sync` owns them cleanly and updates `lumora-lock.json`.
+
+---
+
+## 7. Inside the `LumoraWebServer` Monorepo
+- `bun run check`: Typecheck all workspace packages (`tsconfig.base.json`, `packages/core`, `packages/admin`, `apps/starter`).
 - `bun test`: Run unit and PHP/CLI integration tests.
-- `bun run build`: Build `packages/core/dist` and `apps/starter/dist`.
+- `bun run build`: Build `packages/admin`, `packages/core/dist`, and `apps/starter/dist`.
 - `bun run verify:starter`: Run the 12-Gate Compliance Verifier against `apps/starter`.
 - `bun run validate`: Execute the complete release validation pipeline (`check` → `test` → `build` → `verify:starter` → `version:sync`).

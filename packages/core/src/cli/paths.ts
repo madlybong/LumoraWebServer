@@ -50,6 +50,38 @@ export function toPosixPath(p: string): string {
   return p.replace(/\\/g, "/");
 }
 
+const RESERVED_ADMIN_PATHS = new Set([
+  "public",
+  "core",
+  "content",
+  "storage",
+  "templates",
+  "releases",
+  "assets",
+  "docs",
+  "blog",
+  "legal",
+  "contact",
+]);
+
+export function normalizeAdminPathTs(rawPath?: unknown): string {
+  const raw = typeof rawPath === "string" ? rawPath : "/admin/";
+  let clean = raw.replace(/\\/g, "/").trim();
+  clean = clean.replace(/[^a-zA-Z0-9_\-/]/g, "");
+  clean = clean.replace(/\/+/g, "/");
+  const trimmed = clean.replace(/^\/+|\/+$/g, "");
+  if (
+    trimmed === "" ||
+    trimmed === "." ||
+    trimmed === ".." ||
+    trimmed.includes("..") ||
+    RESERVED_ADMIN_PATHS.has(trimmed)
+  ) {
+    return "/admin/";
+  }
+  return `/${trimmed}/`;
+}
+
 export function sha256Buffer(buf: Buffer | Uint8Array | string): string {
   return createHash("sha256").update(buf).digest("hex");
 }

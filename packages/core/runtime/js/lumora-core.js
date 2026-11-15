@@ -1,13 +1,14 @@
 /**
  * @astrake/lumora-webserver — Shared Core ES Module Runtime (lumora-core.js)
  * 1. Hardware & Network Motion Tier Governor (data-motion="full|lite")
- * 2. Accessible Mobile Navigation Drawer & Escape/Focus Trap
- * 3. First-Party Cookie-Free Attribution Capture (sessionStorage)
- * 4. Context-Aware Inquiry Form Validator ("Reward Early, Punish Late")
- * 5. Conditional On-Site Facility Input Toggle & Live Character Counter
+ * 2. Smart Adaptive Color-Scheme Toggle (light dark / light / dark + localStorage sync)
+ * 3. Accessible Navigation Drawer (native modal <dialog> + legacy hidden drawer fallback)
+ * 4. First-Party Cookie-Free Attribution Capture (sessionStorage)
+ * 5. Accessible Inquiry Form Validator (:user-invalid + aria-invalid + aria-describedby + live announcer)
  */
 
 const ATTR_STORAGE_KEY = 'lumora_attr_v1';
+const THEME_STORAGE_KEY = 'color-scheme';
 const ATTR_KEYS = [
   'utm_source',
   'utm_medium',
@@ -21,6 +22,7 @@ const ATTR_KEYS = [
 
 export function initLumoraCore() {
   initMotionTier();
+  initThemeToggle();
   initNavigationDrawer();
   initFirstPartyAttribution();
   initContactForms();
@@ -35,6 +37,79 @@ export function initMotionTier() {
   const memory = navigator.deviceMemory || 8;
 
   root.dataset.motion = (reducedMotion || saveData || cores <= 4 || memory <= 4) ? 'lite' : 'full';
+}
+
+export function initThemeToggle() {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return;
+  const meta = document.querySelector('meta[name="color-scheme"]');
+  const toggles = document.querySelectorAll('[data-lumora-theme-toggle]');
+  if (!meta) return;
+
+  const media = window.matchMedia?.('(prefers-color-scheme: dark)');
+  const getSystemScheme = () => (media?.matches ? 'dark' : 'light');
+
+  const readStoredScheme = () => {
+    try {
+      const v = window.localStorage?.getItem(THEME_STORAGE_KEY);
+      return v === 'light' || v === 'dark' ? v : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const writeStoredScheme = (val) => {
+    try {
+      if (!window.localStorage) return;
+      if (val === 'light' || val === 'dark') {
+        window.localStorage.setItem(THEME_STORAGE_KEY, val);
+      } else {
+        window.localStorage.removeItem(THEME_STORAGE_KEY);
+      }
+    } catch {
+      // Storage blocked
+    }
+  };
+
+  const getRenderedScheme = (stored) => {
+    if (stored === 'light' || stored === 'dark') return stored;
+    const metaVal = meta.getAttribute('content');
+    if (metaVal === 'light' || metaVal === 'dark') return metaVal;
+    return getSystemScheme();
+  };
+
+  const syncUi = (storedOverride) => {
+    const stored = storedOverride !== undefined ? storedOverride : readStoredScheme();
+    meta.setAttribute('content', stored ?? 'light dark');
+    const rendered = getRenderedScheme(stored);
+    const nextTarget = rendered === 'dark' ? 'light' : 'dark';
+    const label = `Switch to ${nextTarget} color theme`;
+
+    toggles.forEach((btn) => {
+      btn.setAttribute('aria-pressed', rendered === 'dark' ? 'true' : 'false');
+      btn.setAttribute('aria-label', label);
+      btn.setAttribute('title', label);
+      btn.dataset.themeState = rendered;
+    });
+  };
+
+  syncUi();
+
+  toggles.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const currentRendered = getRenderedScheme(readStoredScheme());
+      const target = currentRendered === 'dark' ? 'light' : 'dark';
+      const nextStored = target === getSystemScheme() ? null : target;
+      writeStoredScheme(nextStored);
+      syncUi(nextStored);
+    });
+  });
+
+  media?.addEventListener?.('change', () => syncUi());
+  window.addEventListener('storage', (e) => {
+    if (e.key === THEME_STORAGE_KEY) {
+      syncUi(e.newValue === 'light' || e.newValue === 'dark' ? e.newValue : null);
+    }
+  });
 }
 
 export function initFirstPartyAttribution() {
@@ -123,6 +198,42 @@ export function initNavigationDrawer() {
   const drawer = document.querySelector('[data-lumora-nav-drawer]');
   if (!toggleBtn || !drawer) return;
 
+  const isDialog = drawer.tagName === 'DIALOG' && typeof drawer.showModal === 'function';
+  if (isDialog) {
+    const closeBtn = drawer.querySelector('[data-lumora-nav-close]');
+    const sheet = drawer.querySelector('[data-lumora-nav-sheet]');
+
+    const closeDialog = () => {
+      if (drawer.open) drawer.close();
+    };
+
+    toggleBtn.addEventListener('click', () => {
+      if (drawer.open) {
+        closeDialog();
+      } else {
+        drawer.showModal();
+        toggleBtn.setAttribute('aria-expanded', 'true');
+        document.body.classList.add('is-nav-open');
+      }
+    });
+
+    closeBtn?.addEventListener('click', closeDialog);
+
+    drawer.addEventListener('click', (e) => {
+      if (sheet ? !sheet.contains(e.target) : e.target === drawer) {
+        closeDialog();
+      }
+    });
+
+    drawer.addEventListener('close', () => {
+      toggleBtn.setAttribute('aria-expanded', 'false');
+      document.body.classList.remove('is-nav-open');
+      toggleBtn.focus();
+    });
+
+    return;
+  }
+
   const setOpen = (open) => {
     toggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
     drawer.hidden = !open;
@@ -142,8 +253,56 @@ export function initNavigationDrawer() {
   });
 }
 
+function getPoliteAnnouncer() {
+  let el = document.querySelector('[data-lumora-live-announcer]');
+  if (!el) {
+    el = document.createElement('div');
+    el.setAttribute('data-lumora-live-announcer', 'true');
+    el.setAttribute('aria-live', 'polite');
+    el.className = 'visually-hidden';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
 export function initContactForms() {
   const forms = document.querySelectorAll('form[data-lumora-contact-form]');
+  if (forms.length === 0) return;
+
+  const supportsUserInvalid = typeof CSS !== 'undefined' && typeof CSS.supports === 'function'
+    ? CSS.supports('selector(:user-invalid)')
+    : false;
+  const announcer = getPoliteAnnouncer();
+  let announceTimer = null;
+
+  const linkError = (el, shown) => {
+    const errorId = el.dataset?.error;
+    if (!errorId) return;
+    const ids = (el.getAttribute('aria-describedby') || '')
+      .split(/\s+/)
+      .filter((id) => id && id !== errorId);
+    if (shown) ids.push(errorId);
+    if (ids.length > 0) {
+      el.setAttribute('aria-describedby', ids.join(' '));
+    } else {
+      el.removeAttribute('aria-describedby');
+    }
+  };
+
+  const announceFieldError = (el) => {
+    const errorId = el.dataset?.error;
+    if (!errorId) return;
+    const errEl = document.getElementById(errorId);
+    if (!errEl) return;
+    const labelText = el.labels?.[0]?.textContent?.replace(/\s+/g, ' ').trim() || el.name || 'Field';
+    const msgText = errEl.textContent?.replace(/\s+/g, ' ').trim() || el.validationMessage || 'Invalid value.';
+    clearTimeout(announceTimer);
+    announcer.textContent = '';
+    announceTimer = setTimeout(() => {
+      announcer.textContent = `${labelText}: ${msgText}`;
+    }, 350);
+  };
+
   forms.forEach((form) => {
     const modeSelect = form.querySelector('[data-lumora-delivery-mode]');
     const onsiteBox = form.querySelector('[data-lumora-onsite-fields]');
@@ -183,33 +342,128 @@ export function initContactForms() {
       });
     });
 
-    // "Reward Early, Punish Late" inline field validation
-    const validatedInputs = form.querySelectorAll('input[required], textarea[required], select[required]');
-    validatedInputs.forEach((input) => {
-      const checkField = (showError) => {
-        const isValid = input.checkValidity();
-        if (isValid) {
-          input.setAttribute('aria-invalid', 'false');
-          input.classList.remove('is-invalid');
-          input.classList.add('is-valid');
-        } else if (showError) {
-          input.setAttribute('aria-invalid', 'true');
-          input.classList.remove('is-valid');
-          input.classList.add('is-invalid');
-        }
-      };
+    const controls = Array.from(form.querySelectorAll('input, select, textarea')).filter(
+      (el) => el.type !== 'hidden' && el.name !== 'website_url'
+    );
+    const interacted = new WeakSet();
+    const serverInvalid = new WeakSet();
+    const announced = new WeakSet();
 
-      input.addEventListener('blur', () => {
-        if (input.value.trim() !== '') {
-          checkField(true);
+    controls.forEach((el) => {
+      if (el.getAttribute('aria-invalid') === 'true') {
+        serverInvalid.add(el);
+        linkError(el, true);
+      } else {
+        el.setAttribute('aria-invalid', 'false');
+      }
+    });
+
+    const syncFieldState = (el, forceShow = false, shouldAnnounce = false) => {
+      if (!el || typeof el.checkValidity !== 'function') return true;
+      if (serverInvalid.has(el) && !interacted.has(el)) {
+        return false;
+      }
+
+      let isInvalid = false;
+      if (forceShow) {
+        isInvalid = !el.validity.valid;
+      } else if (supportsUserInvalid) {
+        try {
+          isInvalid = el.matches(':user-invalid');
+        } catch {
+          isInvalid = interacted.has(el) && !el.validity.valid;
+        }
+      } else {
+        isInvalid = interacted.has(el) && !el.validity.valid;
+      }
+
+      if (isInvalid) {
+        el.setAttribute('aria-invalid', 'true');
+        el.classList.remove('is-valid');
+        el.classList.add('is-invalid');
+        linkError(el, true);
+        if (shouldAnnounce && !announced.has(el)) {
+          announceFieldError(el);
+          announced.add(el);
+        }
+        return false;
+      }
+
+      el.setAttribute('aria-invalid', 'false');
+      el.classList.remove('is-invalid');
+      if (interacted.has(el) && el.validity.valid && (el.required || String(el.value || '').trim() !== '')) {
+        el.classList.add('is-valid');
+      } else {
+        el.classList.remove('is-valid');
+      }
+      linkError(el, false);
+      announced.delete(el);
+      return true;
+    };
+
+    form.addEventListener('blur', (e) => {
+      const el = e.target;
+      if (!controls.includes(el)) return;
+      interacted.add(el);
+      const hasContent = el.type === 'checkbox' || el.tagName === 'SELECT' || String(el.value || '').trim() !== '';
+      syncFieldState(el, hasContent && !el.validity.valid, true);
+    }, true);
+
+    form.addEventListener('input', (e) => {
+      const el = e.target;
+      if (!controls.includes(el)) return;
+      interacted.add(el);
+      serverInvalid.delete(el);
+      if (el.getAttribute('aria-invalid') === 'true' || el.classList.contains('is-invalid') || el.classList.contains('is-valid')) {
+        syncFieldState(el, !el.validity.valid && el.classList.contains('is-invalid'), false);
+      }
+    });
+
+    form.addEventListener('change', (e) => {
+      const el = e.target;
+      if (!controls.includes(el)) return;
+      interacted.add(el);
+      serverInvalid.delete(el);
+      syncFieldState(el, !el.validity.valid, true);
+    }, true);
+
+    form.addEventListener('invalid', (e) => {
+      const el = e.target;
+      if (!controls.includes(el)) return;
+      interacted.add(el);
+      announced.add(el);
+      syncFieldState(el, true, false);
+    }, true);
+
+    form.addEventListener('reset', () => {
+      setTimeout(() => {
+        controls.forEach((el) => {
+          interacted.delete(el);
+          serverInvalid.delete(el);
+          announced.delete(el);
+          el.setAttribute('aria-invalid', 'false');
+          el.classList.remove('is-invalid', 'is-valid');
+          linkError(el, false);
+        });
+      });
+    });
+
+    form.addEventListener('submit', (e) => {
+      if (!form.noValidate) return;
+      let firstInvalid = null;
+      controls.forEach((el) => {
+        if (typeof el.checkValidity !== 'function') return;
+        if (!el.validity.valid) {
+          interacted.add(el);
+          announced.add(el);
+          syncFieldState(el, true, false);
+          if (!firstInvalid) firstInvalid = el;
         }
       });
-
-      input.addEventListener('input', () => {
-        if (input.getAttribute('aria-invalid') === 'true' || input.classList.contains('is-valid')) {
-          checkField(false);
-        }
-      });
+      if (firstInvalid) {
+        e.preventDefault();
+        firstInvalid.focus();
+      }
     });
 
     if (msgInput && charCounter) {

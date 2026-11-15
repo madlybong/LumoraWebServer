@@ -25,8 +25,17 @@ if (in_array($uriPath, $protectedFiles, true)) {
     return true;
 }
 
-// Serve static files under /public/ directly via PHP SAPI
+// Serve static files under /public/ directly via PHP SAPI (strictly block active/script uploads)
 if (str_starts_with($uriPath, '/public/')) {
+    if (
+        str_starts_with($uriPath, '/public/uploads/')
+        && preg_match('/\.(php[0-9]?|phtml|phar|svgz?|html?|xhtml|pl|py|sh|cgi)$/i', $uriPath) === 1
+    ) {
+        http_response_code(403);
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo '403 Forbidden';
+        return true;
+    }
     $candidate = __DIR__ . str_replace('/', DIRECTORY_SEPARATOR, $uriPath);
     if (is_file($candidate)) {
         return false;

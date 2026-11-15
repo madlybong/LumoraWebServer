@@ -6,6 +6,7 @@ on:
       - "VERSION"
       - "package.json"
       - "packages/core/package.json"
+      - "packages/admin/package.json"
       - "apps/starter/package.json"
       - "tools/version.ts"
 

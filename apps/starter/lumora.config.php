@@ -14,10 +14,10 @@ return [
         'legal_entity'  => 'Lumora Maintainers',
         'domain'        => 'lumora-starter.example.com',
         'origin'        => 'https://lumora-starter.example.com',
-        'version'       => '0.1.2',
+        'version'       => '0.2.0',
         'locale'        => 'en',
-        'theme_color'   => '#0a0a0a',
-        'color_scheme'  => 'light',
+        'theme_color'   => '#09090b',
+        'color_scheme'  => 'light dark',
         'category'      => 'DeveloperApplication',
         'slogan'        => 'Headless PHP 8.2+ Website Micro-Kernel & Tailwind CSS v4 Framework',
         'description'   => 'Reference website powered by @astrake/lumora-webserver featuring hardened HTTP security headers, CGNAT-safe v2 CSRF, SQLite WAL persistence, and zero-dependency dist/ builds.',
@@ -70,5 +70,19 @@ return [
         'release_server' => true,
         'legal_registry' => true,
         'inquiry_engine' => true,
+        'admin_panel'    => true,
+    ],
+
+    'admin' => [
+        'path'               => '/admin/',
+        'session_ttl_sec'    => 28800,
+        'require_2fa'        => false,
+        'max_login_attempts' => 5,
+        'lockout_window_sec' => 900,
+        'branding'           => [
+            'title'         => 'Lumora Starter Console',
+            'logo'          => '/public/brand/icon.svg',
+            'default_theme' => 'system',
+        ],
     ],
 ];

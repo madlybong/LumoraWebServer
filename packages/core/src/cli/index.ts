@@ -6,3 +6,4 @@ export * from "./verify";
 export * from "./dev";
 export * from "./flush";
 export * from "./init";
+export * from "./admin";

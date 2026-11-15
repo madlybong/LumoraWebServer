@@ -21,6 +21,18 @@
 }
 
 @layer base {
+  :root {
+    color-scheme: light dark;
+  }
+
+  :root:has(> head > meta[name="color-scheme"][content="dark"]) {
+    color-scheme: dark;
+  }
+
+  :root:has(> head > meta[name="color-scheme"][content="light"]) {
+    color-scheme: light;
+  }
+
   *, *::before, *::after {
     box-sizing: border-box;
   }
@@ -36,6 +48,19 @@
   :focus-visible {
     outline: var(--focus-ring, 2px solid var(--color-accent, #0055FF));
     outline-offset: var(--focus-offset, 4px);
+  }
+
+  /* Visually Hidden Screen-Reader Live Region & Labels */
+  .visually-hidden:where(:not(:focus-within, :active)) {
+    position: absolute !important;
+    clip-path: inset(50%) !important;
+    overflow: hidden !important;
+    width: 1px !important;
+    height: 1px !important;
+    margin: -1px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    white-space: nowrap !important;
   }
 
   /* Skip Navigation Primitive */

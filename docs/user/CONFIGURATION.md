@@ -20,7 +20,7 @@
 | `framework_label` | `string` | `'lumora-webserver'` | Framework label emitted in `/health`. |
 | `domain` | `string` | `'localhost'` | Bare canonical domain (used for non-www redirects and SMTP `EHLO`). |
 | `origin` | `string` | `'https://localhost'` | Full canonical origin URL without trailing slash (e.g., `'https://acme.example.com'`). |
-| `version` | `string` | `'0.1.2'` | Product/website version string emitted in `/health` and legal headers. |
+| `version` | `string` | `'0.2.0'` | Product/website version string emitted in `/health` and legal headers. |
 | `locale` | `string` | `'en'` | BCP-47 locale tag emitted in `<html lang>`, `hreflang`, and Schema.org `WebSite`. |
 | `theme_color` | `string` | `'#0a0a0a'` | Browser theme color meta and webmanifest token. |
 | `color_scheme` | `'light'\|'dark'` | `'light'` | `<meta name="color-scheme">` value. |
@@ -68,6 +68,7 @@
 | `legal.retention_days_logs` | `int\|null` | `180` | Days before `InquiryDb::prune()` deletes old rate-limit/log entries (`0` disables purge). |
 | `features.legal_registry` | `bool` | `true` | Disables all `/legal/*` routes when `false`. |
 | `features.inquiry_engine` | `bool` | `true` | Controls inquiry engine checks during `lumora-web verify`. |
+| `features.admin_panel` | `bool` | `false` | Enables the opt-in Vue 3 + `shadcn-vue` Admin Console & Hybrid SQLite CMS (`sync` & `build` emit admin assets/stubs when `true`). |
 
 ### 1.4. `hub` & `notifications` Sections
 | Key | Type | Default | Description |
@@ -77,6 +78,23 @@
 | `hub.shared_secret` | `string` | `''` | HMAC signing secret (can also be supplied via `LUMORA_HUB_SECRET` or `storage/hub-secret.php`). |
 | `hub.timeout_ms` | `int` | `1500` | HTTP timeout in milliseconds (`500`–`3000`). |
 | `hub.fallback_notify` | `bool` | `true` | Runs standalone Edge SMTP/WhatsApp notifications if the Hub is disabled or unreachable. |
+
+### 1.5. `admin` Section (Opt-In Admin Panel & Hybrid CMS)
+Requires `'features' => ['admin_panel' => true]`.
+| Key | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `admin.path` | `string` | `'/admin/'` | Normalized mount path (e.g., `'/_console/'`). Excluded from `/sitemap.xml` and `/robots.txt` for stealth; `lumora-web build` emits physical `dist/<path>/` stubs. |
+| `admin.session_ttl_sec` | `int` | `28800` | Authenticated admin session lifetime in seconds (minimum `300` at runtime). |
+| `admin.require_2fa` | `bool` | `false` | Forces all logged-in operators to enroll in RFC 6238 TOTP 2FA before using workspace modules. |
+| `admin.allowed_roles` | `string[]` | `['owner', 'editor', 'viewer']` | Restricts which RBAC roles (`'owner'`, `'editor'`, `'viewer'`) may authenticate or access console modules. |
+| `admin.max_login_attempts` | `int` | `5` | Failed login attempts per IP hash before HTTP `429` lockout inside `lockout_window_sec`. |
+| `admin.lockout_window_sec` | `int` | `900` | Lockout window in seconds for admin authentication failures. |
+| `admin.max_upload_bytes` | `int` | `5242880` | Maximum uploaded raster image size in bytes for the Media Library (default 5 MiB; WebP/AVIF/PNG/JPEG only). |
+| `admin.branding.title` | `string` | `'{Brand} Admin'` | Console `<title>` and header brand label. |
+| `admin.branding.logo` | `string` | `''` | Optional light-mode local logo URL (e.g., `'/public/brand/logo.svg'`). |
+| `admin.branding.logo_dark` | `string` | `''` | Optional dark-mode local logo URL. |
+| `admin.branding.default_theme` | `'light'\|'dark'\|'system'` | `'system'` | Initial UI color theme before operator preference is saved in `localStorage`. |
+| `admin.initial_owner` | `array\|null` | `null` | Optional `['email' => '...', 'name' => '...', 'password_hash' => '$argon2id$...']` bootstrap owner synced automatically on first DB connection (generate hash via `lumora-web admin hash-password`). |
 
 ---
 
@@ -124,3 +142,4 @@ To create a standalone custom page (such as `content/legal/refund-policy.php`), 
 | `LUMORA_NOTIFY_EMAIL_ENABLED` | `'true'` / `'false'` to enable standalone Edge SMTP/mail notifications. |
 | `LUMORA_SMTP_HOST` / `PORT` / `USER` / `PASS` | Standalone Edge SMTP socket credentials (`port` `587` STARTTLS or `465` implicit TLS). |
 | `LUMORA_WA_ENABLED` / `PROVIDER` / `PHONE` / `APIKEY` / `WEBHOOK_URL` | Standalone Edge self-hosted WhatsApp notification settings (`waha`, `evolution`, or `webhook`). |
+| `LUMORA_ADMIN_SETUP_TOKEN` | One-time setup secret enabling initial `owner` provisioning at `auth.setup` when no `owner` exists in SQLite (`lumora-web admin create-user` can also provision offline). |
